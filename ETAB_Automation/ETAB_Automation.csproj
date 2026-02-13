@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="netDxf" Version="2023.11.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="ETABSv1">
+      <HintPath>..\..\..\..\..\..\Program Files\Computers and Structures\ETABS 23\ETABSv1.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

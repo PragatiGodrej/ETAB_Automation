@@ -1,0 +1,438 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\core\\storymanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\core\\storymanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\importers\\slabimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\importers\\slabimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\ui\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\ui\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\core\\gradeschedulamanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\core\\gradeschedulamanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\core\\etabcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\core\\etabcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\core\\cadimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\core\\cadimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\importers\\wallimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\importers\\wallimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\ui\\importconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\ui\\importconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\importers\\cadlayerreader.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\importers\\cadlayerreader.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\importers\\beamimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\importers\\beamimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\importers\\wallthicknesscalculator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\importers\\wallthicknesscalculator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\models\\floortypeconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\models\\floortypeconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\ui\\importconfig.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\ui\\importconfig.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\models\\gradescheduleentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\models\\gradescheduleentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\models\\beamsection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\models\\beamsection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\models\\slabsection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\models\\slabsection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\models\\layermapping.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\models\\layermapping.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\ui\\mainform.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\ui\\mainform.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\ui\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\ui\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\ui\\importconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\ui\\importconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\etab_automation.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\etab_automation.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|c:\\users\\pragati.patil\\source\\repos\\etab_automation\\etab_automation\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{7F498AC5-5466-4625-8835-DF46ECC5C420}|ETAB_Automation\\ETAB_Automation.csproj|solutionrelative:etab_automation\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 634,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "StoryManager.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\StoryManager.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Core\\StoryManager.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\StoryManager.cs",
+              "RelativeToolTip": "ETAB_Automation\\Core\\StoryManager.cs",
+              "ViewState": "AgIAAEIBAAAAAAAAAAAqwHgAAAAOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T10:07:09.993Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "CADImporter.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\CADImporter.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Core\\CADImporter.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\CADImporter.cs",
+              "RelativeToolTip": "ETAB_Automation\\Core\\CADImporter.cs",
+              "ViewState": "AgIAAMoAAAAAAAAAAAAIwO4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T10:04:38.348Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "WallImporter.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\WallImporter.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Importers\\WallImporter.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\WallImporter.cs",
+              "RelativeToolTip": "ETAB_Automation\\Importers\\WallImporter.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAALoAAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T10:00:09.911Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "WallThicknessCalculator.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\WallThicknessCalculator.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Importers\\WallThicknessCalculator.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\WallThicknessCalculator.cs",
+              "RelativeToolTip": "ETAB_Automation\\Importers\\WallThicknessCalculator.cs",
+              "ViewState": "AgIAAB4AAAAAAAAAAAAYwDYAAABbAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T09:59:15.664Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "BeamImporter.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\BeamImporter.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Importers\\BeamImporter.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\BeamImporter.cs",
+              "RelativeToolTip": "ETAB_Automation\\Importers\\BeamImporter.cs",
+              "ViewState": "AgIAADcAAAAAAAAAAADwvwUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T09:58:39.459Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "GradeSchedulamanager.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\GradeSchedulamanager.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Core\\GradeSchedulamanager.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\GradeSchedulamanager.cs",
+              "RelativeToolTip": "ETAB_Automation\\Core\\GradeSchedulamanager.cs",
+              "ViewState": "AgIAAEUAAAAAAAAAAAAQwF0AAAAsAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T09:57:36.501Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "SlabImporter.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\SlabImporter.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Importers\\SlabImporter.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\SlabImporter.cs",
+              "RelativeToolTip": "ETAB_Automation\\Importers\\SlabImporter.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T09:55:44.025Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "CADLayerReader.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\CADLayerReader.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Importers\\CADLayerReader.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Importers\\CADLayerReader.cs",
+              "RelativeToolTip": "ETAB_Automation\\Importers\\CADLayerReader.cs",
+              "ViewState": "AgIAAAcAAAAAAAAAAADwvyoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T08:29:11.13Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "SlabSection.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\SlabSection.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Models\\SlabSection.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\SlabSection.cs",
+              "RelativeToolTip": "ETAB_Automation\\Models\\SlabSection.cs",
+              "ViewState": "AgIAAAgAAAAAAAAAAAAxwAsAAABQAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T08:20:59.112Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "LayerMapping.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\LayerMapping.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Models\\LayerMapping.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\LayerMapping.cs",
+              "RelativeToolTip": "ETAB_Automation\\Models\\LayerMapping.cs",
+              "ViewState": "AgIAAEIAAAAAAAAAAAAcwFMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T08:20:13.786Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "GradeScheduleEntry.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\GradeScheduleEntry.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Models\\GradeScheduleEntry.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\GradeScheduleEntry.cs",
+              "RelativeToolTip": "ETAB_Automation\\Models\\GradeScheduleEntry.cs",
+              "ViewState": "AgIAACsAAAAAAAAAAAAvwD0AAAARAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T08:18:59.005Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "BeamSection.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\BeamSection.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Models\\BeamSection.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\BeamSection.cs",
+              "RelativeToolTip": "ETAB_Automation\\Models\\BeamSection.cs",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAAB8AAAA6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T08:17:58.24Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "FloorTypeConfig.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\FloorTypeConfig.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Models\\FloorTypeConfig.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Models\\FloorTypeConfig.cs",
+              "RelativeToolTip": "ETAB_Automation\\Models\\FloorTypeConfig.cs",
+              "ViewState": "AgIAAPsAAAAAAAAAAADwvx4BAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T08:12:45.942Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Program.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Program.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Program.cs",
+              "RelativeToolTip": "ETAB_Automation\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:50:18.881Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "ImportConfig.Designer.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\ImportConfig.Designer.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\UI\\ImportConfig.Designer.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\ImportConfig.Designer.cs",
+              "RelativeToolTip": "ETAB_Automation\\UI\\ImportConfig.Designer.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAUwCgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:48:49.875Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "MainForm.Designer.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\MainForm.Designer.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\UI\\MainForm.Designer.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\MainForm.Designer.cs",
+              "RelativeToolTip": "ETAB_Automation\\UI\\MainForm.Designer.cs",
+              "ViewState": "AgIAACEAAAAAAAAAAAAYwAAAAAAOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:39:28.304Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "ImportConfig.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\ImportConfig.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\UI\\ImportConfig.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\ImportConfig.cs",
+              "RelativeToolTip": "ETAB_Automation\\UI\\ImportConfig.cs",
+              "ViewState": "AgIAAAwIAAAAAAAAAAAUwB8IAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:39:33.514Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "MainForm.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\MainForm.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\UI\\MainForm.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\MainForm.cs",
+              "RelativeToolTip": "ETAB_Automation\\UI\\MainForm.cs",
+              "ViewState": "AgIAAOYCAAAAAAAAAAAUwAsDAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:39:30.301Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 20,
+              "Title": "ImportConfig.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\ImportConfig.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\UI\\ImportConfig.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\ImportConfig.cs [Design]",
+              "RelativeToolTip": "ETAB_Automation\\UI\\ImportConfig.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:39:20.67Z",
+              "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "MainForm.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\MainForm.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\UI\\MainForm.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\UI\\MainForm.cs [Design]",
+              "RelativeToolTip": "ETAB_Automation\\UI\\MainForm.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:38:41.921Z",
+              "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 21,
+              "Title": "ETAB_Automation",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\ETAB_Automation.csproj",
+              "RelativeDocumentMoniker": "ETAB_Automation\\ETAB_Automation.csproj",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\ETAB_Automation.csproj",
+              "RelativeToolTip": "ETAB_Automation\\ETAB_Automation.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-02-13T06:37:46.239Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ETABController.cs",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\ETABController.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Core\\ETABController.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Core\\ETABController.cs",
+              "RelativeToolTip": "ETAB_Automation\\Core\\ETABController.cs",
+              "ViewState": "AgIAALcAAAAAAAAAAAAIwNsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:37:20.518Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 22,
+              "Title": "Form1.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Form1.cs",
+              "RelativeDocumentMoniker": "ETAB_Automation\\Form1.cs",
+              "ToolTip": "C:\\Users\\pragati.patil\\source\\repos\\ETAB_Automation\\ETAB_Automation\\Form1.cs [Design]",
+              "RelativeToolTip": "ETAB_Automation\\Form1.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-13T06:31:34.106Z",
+              "EditorCaption": " [Design]"
+            }
+          ]
+        },
+        {
+          "DockedHeight": 129,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            }
+          ]
+        },
+        {
+          "DockedHeight": 129,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            }
+          ]
+        },
+        {
+          "DockedHeight": 336,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{a80febb4-e7e0-4147-b476-21aaf2453969}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
