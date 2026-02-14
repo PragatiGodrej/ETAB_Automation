@@ -107,6 +107,23 @@ namespace ETAB_Automation.Core
                     // Import floors
                     for (int floor = 0; floor < floorConfig.Count; floor++)
                     {
+
+                        // ✅ ADD BOUNDS CHECK
+                        if (currentStoryIndex >= totalStories)
+                        {
+                            MessageBox.Show(
+                                $"❌ ERROR: Story index out of bounds!\n" +
+                                $"Trying to access story {currentStoryIndex} but only {totalStories} stories exist.\n" +
+                                $"Floor config: {floorConfig.Name}, floor {floor + 1}/{floorConfig.Count}",
+                                "Index Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                            return false;
+                        }
+
+                        System.Diagnostics.Debug.WriteLine(
+                            $"\n📍 Importing: {storyNames[currentStoryIndex]} (Index: {currentStoryIndex})");
+
                         double baseElevation = storyManager.GetStoryBaseElevation(currentStoryIndex);
                         double topElevation = storyManager.GetStoryTopElevation(currentStoryIndex);
 

@@ -1506,7 +1506,7 @@ namespace ETAB_Automation
             mappedLayerListBoxes[floorType] = lstMapped;
         }
 
-      
+
         /// <summary>
         /// Load CAD file and populate available layers
         /// Reads actual layers from DXF files using netDxf library
