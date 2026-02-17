@@ -1,346 +1,15 @@
 ﻿
-//// ============================================================================
-//// FILE: UI/MainForm.cs (WITH GRADE SCHEDULE SUPPORT)
-//// ============================================================================
-//using System;
-//using System.Collections.Generic;
-//using System.Windows.Forms;
-//using ETAB_Automation.Core;
-////using ETABS_Automation.Importers;
-////using ETABS_Automation.Models;
-
-//namespace ETAB_Automation
-//{
-//    public partial class MainForm : Form
-//    {
-//        private ETABSController etabs;
-
-//        public MainForm()
-//        {
-//            InitializeComponent();
-//            etabs = new ETABSController();
-//        }
-
-//        private void btnStartETABS_Click(object sender, EventArgs e)
-//        {
-//            try
-//            {
-//                if (etabs.Connect())
-//                {
-//                    MessageBox.Show(
-//                        "ETABS Connected Successfully!\n\nYou can now import CAD files.",
-//                        "Success",
-//                        MessageBoxButtons.OK,
-//                        MessageBoxIcon.Information);
-//                }
-//                else
-//                {
-//                    MessageBox.Show(
-//                        "ETABS Connection Failed.\n\nPlease ensure:\n" +
-//                        "1. ETABS is installed\n" +
-//                        "2. ETABS is running\n" +
-//                        "3. You have proper permissions",
-//                        "Connection Error",
-//                        MessageBoxButtons.OK,
-//                        MessageBoxIcon.Error);
-//                }
-//            }
-//            catch (Exception ex)
-//            {
-//                MessageBox.Show(
-//                    $"Error connecting to ETABS:\n{ex.Message}",
-//                    "Error",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Error);
-//            }
-//        }
-
-//        private void btnImportCAD_Click(object sender, EventArgs e)
-//        {
-//            if (etabs.SapModel == null)
-//            {
-//                MessageBox.Show(
-//                    "Please connect to ETABS first.",
-//                    "Not Connected",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Warning);
-//                return;
-//            }
-
-//            try
-//            {
-//                using (ImportConfigForm importForm = new ImportConfigForm())
-//                {
-//                    if (importForm.ShowDialog() == DialogResult.OK)
-//                    {
-//                        // ⭐ GET ALL CONFIGURATION DATA FROM FORM
-//                        var floorConfigs = importForm.FloorConfigs;
-//                        string seismicZone = importForm.SeismicZone;
-//                        var beamDepths = importForm.BeamDepths;
-//                        var slabThicknesses = importForm.SlabThicknesses;
-//                        var wallGrades = importForm.WallGrades;           // ⭐ NEW
-//                        var floorsPerGrade = importForm.FloorsPerGrade;   // ⭐ NEW
-
-//                        // Calculate total stories and heights
-//                        int totalStories = 0;
-//                        List<double> storyHeights = new List<double>();
-//                        List<string> storyNames = new List<string>();
-
-//                        foreach (var config in floorConfigs)
-//                        {
-//                            System.Diagnostics.Debug.WriteLine($"DEBUG: {config.Name} height = {config.Height}");
-
-//                            for (int i = 0; i < config.Count; i++)
-//                            {
-//                                storyHeights.Add(config.Height);
-
-//                                string storyName = "";
-//                                if (config.Name == "Basement")
-//                                    storyName = $"Basement{i + 1}";
-//                                else if (config.Name == "Podium")
-//                                    storyName = $"Podium{i + 1}";
-//                                else if (config.Name == "EDeck")
-//                                    storyName = "EDeck";
-//                                else if (config.Name == "Typical")
-//                                    storyName = $"F{i + 1:D2}";
-//                                else if (config.Name == "Terrace")
-//                                    storyName = "Terrace";
-
-//                                storyNames.Add(storyName);
-//                                totalStories++;
-//                            }
-//                        }
-
-//                        double totalHeight = CalculateTotalHeight(storyHeights);
-
-//                        // Build confirmation message
-//                        string heightBreakdown = BuildHeightBreakdown(storyHeights, storyNames);
-//                        string beamConfig = BuildBeamConfigSummary(seismicZone, beamDepths);
-//                        string slabConfig = BuildSlabConfigSummary(slabThicknesses);
-//                        //string gradeConfig = BuildGradeSummary(wallGrades, floorsPerGrade); // ⭐ NEW
-
-//                        //var result = MessageBox.Show(
-//                        //    $"Final Import Configuration:\n\n" +
-//                        //    $"Total Stories: {totalStories}\n" +
-//                        //    $"Total Building Height: {totalHeight:F2}m\n" +
-//                        //    $"Seismic Zone: {seismicZone}\n\n" +
-//                        //    heightBreakdown + "\n" +
-//                        //    //beamConfig + "\n" +
-//                        //    //slabConfig + "\n" +
-//                        //    gradeConfig + "\n" +  // ⭐ NEW
-//                        //    "Proceed with import?",
-//                        //    "⚠️ Final Confirmation",
-//                        //    MessageBoxButtons.YesNo,
-//                        //    MessageBoxIcon.Question);
-
-//                        //if (result != DialogResult.Yes)
-//                        //{
-//                        //    MessageBox.Show("Import cancelled.", "Cancelled");
-//                        //    return;
-//                        //}
-
-//                        //// ⭐ IMPORT WITH GRADE SCHEDULE
-//                        //CADImporterEnhanced importer = new CADImporterEnhanced(etabs.SapModel);
-//                        //bool success = importer.ImportMultiFloorTypeCAD(
-//                        //    floorConfigs,
-//                        //    storyHeights,
-//                        //    storyNames,
-//                        //    seismicZone,
-//                        //    beamDepths,
-//                        //    slabThicknesses,
-//                        //    wallGrades,      // ⭐ PASS WALL GRADES
-//                        //    floorsPerGrade); // ⭐ PASS FLOOR COUNTS
-
-//                        //if (success)
-//                        //{
-//                        //    MessageBox.Show(
-//                        //        "✅ Import completed successfully!\n\n" +
-//                        //        "Building Structure Created:\n" +
-//                        //        $"- Total Stories: {totalStories}\n" +
-//                        //        $"- Building Height: {totalHeight:F2}m\n" +
-//                        //        $"- Seismic Zone: {seismicZone}\n\n" +
-//                        //        "Beam Configuration Applied:\n" +
-//                        //        //BuildBeamConfigSummary(seismicZone, beamDepths) + "\n\n" +
-//                        //        //"Slab Configuration Applied:\n" +
-//                        //        //BuildSlabConfigSummary(slabThicknesses) + "\n\n" +
-//                        //        //"Concrete Grade Schedule Applied:\n" +  // ⭐ NEW
-//                        //        BuildGradeSummary(wallGrades, floorsPerGrade) + "\n\n" +
-//                        //        "View Your Building:\n" +
-//                        //        "1. Check bottom of ETABS window\n" +
-//                        //        "2. Use story dropdown to navigate floors\n" +
-//                        //        "3. Each floor type has its own unique layout",
-//                        //        "Import Success!",
-//                        //        MessageBoxButtons.OK,
-//                        //        MessageBoxIcon.Information);
-//                        //}
-//                        //else
-//                        //{
-//                        //    MessageBox.Show(
-//                        //        "Import completed but some elements may not have been created.\n" +
-//                        //        "Please review the ETABS model.",
-//                        //        "Warning",
-//                        //        MessageBoxButtons.OK,
-//                        //        MessageBoxIcon.Warning);
-//                        //}
-//                    }
-//                }
-//            }
-//            catch (Exception ex)
-//            {
-//                MessageBox.Show(
-//                    $"Error during import:\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}",
-//                    "Import Error",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Error);
-//            }
-//        }
-
-//        private void btnExit_Click(object sender, EventArgs e)
-//        {
-//            var result = MessageBox.Show(
-//                "Are you sure you want to exit?\n\nNote: ETABS will remain open.",
-//                "Confirm Exit",
-//                MessageBoxButtons.YesNo,
-//                MessageBoxIcon.Question);
-
-//            if (result == DialogResult.Yes)
-//            {
-//                Application.Exit();
-//            }
-//        }
-
-//        protected override void OnFormClosing(FormClosingEventArgs e)
-//        {
-//            // Only show confirmation if user is closing (not programmatic close)
-//            if (e.CloseReason == CloseReason.UserClosing)
-//            {
-//                var result = MessageBox.Show(
-//                    "Are you sure you want to exit?\n\nNote: ETABS will remain open.",
-//                    "Confirm Exit",
-//                    MessageBoxButtons.YesNo,
-//                    MessageBoxIcon.Question);
-
-//                if (result != DialogResult.Yes)
-//                {
-//                    e.Cancel = true;
-//                    return;
-//                }
-//            }
-
-//            base.OnFormClosing(e);
-//        }
-
-//        // ====================================================================
-//        // HELPER METHODS
-//        // ====================================================================
-
-//        private string BuildSlabConfigSummary(Dictionary<string, int> slabThicknesses)
-//        {
-//            string summary = "Slab Configuration:\n";
-//            summary += $"  - Lobby: {slabThicknesses["Lobby"]}mm\n";
-//            summary += $"  - Stair: {slabThicknesses["Stair"]}mm\n";
-//            summary += $"  - Regular: 125-250mm (area-based)\n";
-//            summary += $"  - Cantilever: 125-200mm (span-based)\n";
-
-//            return summary;
-//        }
-
-//        private string BuildHeightBreakdown(List<double> storyHeights, List<string> storyNames)
-//        {
-//            string breakdown = "Story Height Breakdown:\n";
-//            double cumulativeHeight = 0;
-
-//            for (int i = 0; i < storyHeights.Count; i++)
-//            {
-//                cumulativeHeight += storyHeights[i];
-//                breakdown += $"{storyNames[i]}: {storyHeights[i]:F2}m (Elevation: {cumulativeHeight:F2}m)\n";
-//            }
-
-//            return breakdown;
-//        }
-
-//        private string BuildBeamConfigSummary(string seismicZone, Dictionary<string, int> beamDepths)
-//        {
-//            int gravityWidth = (seismicZone == "Zone II" || seismicZone == "Zone III") ? 200 : 240;
-
-//            string summary = "Beam Configuration:\n";
-//            summary += $"Gravity Beams (Width: {gravityWidth}mm):\n";
-//            summary += $"  - Internal Gravity: {gravityWidth}x{beamDepths["InternalGravity"]}mm\n";
-//            summary += $"  - Cantilever Gravity: {gravityWidth}x{beamDepths["CantileverGravity"]}mm\n";
-//            summary += $"Main Beams (Width: matches wall):\n";
-//            summary += $"  - Core Main: {beamDepths["CoreMain"]}mm depth\n";
-//            summary += $"  - Peripheral Dead Main: {beamDepths["PeripheralDeadMain"]}mm depth\n";
-//            summary += $"  - Peripheral Portal Main: {beamDepths["PeripheralPortalMain"]}mm depth\n";
-//            summary += $"  - Internal Main: {beamDepths["InternalMain"]}mm depth\n";
-
-//            return summary;
-//        }
-
-//        //// ⭐ NEW: Build grade schedule summary
-//        //private string BuildGradeSummary(List<string> wallGrades, List<int> floorsPerGrade)
-//        //{
-//        //    if (wallGrades == null || floorsPerGrade == null || wallGrades.Count == 0)
-//        //        return "Concrete Grade Configuration:\n  - Default grades applied\n";
-
-//        //    string summary = "Concrete Grade Configuration:\n";
-//        //    int floorStart = 1;
-
-//        //    for (int i = 0; i < wallGrades.Count; i++)
-//        //    {
-//        //        int floorEnd = floorStart + floorsPerGrade[i] - 1;
-//        //        string beamSlabGrade = CalculateBeamSlabGrade(wallGrades[i]);
-
-//        //        summary += $"  - Floors {floorStart}-{floorEnd}: Wall {wallGrades[i]}, Beam/Slab {beamSlabGrade}\n";
-//        //        floorStart = floorEnd + 1;
-//        //    }
-
-//        //    return summary;
-//        //}
-
-//        //// ⭐ NEW: Calculate beam/slab grade from wall grade
-//        //private string CalculateBeamSlabGrade(string wallGrade)
-//        //{
-//        //    try
-//        //    {
-//        //        // Extract numeric value (e.g., "M50" → 50)
-//        //        int wallValue = int.Parse(wallGrade.Replace("M", "").Replace("m", "").Trim());
-
-//        //        // Calculate 0.7x and round to nearest 5
-//        //        int beamSlabValue = (int)(Math.Round((wallValue * 0.7) / 5.0) * 5);
-
-//        //        // Minimum M20
-//        //        if (beamSlabValue < 20)
-//        //            beamSlabValue = 20;
-
-//        //        return $"M{beamSlabValue}";
-//        //    }
-//        //    catch
-//        //    {
-//        //        return "M30"; // Fallback
-//        //    }
-//        //}
-
-//        private double CalculateTotalHeight(List<double> storyHeights)
-//        {
-//            double total = 0;
-//            foreach (double height in storyHeights)
-//            {
-//                total += height;
-//            }
-//            return total;
-//        }
-//    }
-//}
 // ============================================================================
-// FILE: UI/MainForm.cs (UPDATED WITH GRADE SCHEDULE INTEGRATION)
+// FILE: UI/MainForm.cs (UPDATED FOR PER-FLOOR BEAM/SLAB CONFIGURATION)
 // ============================================================================
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows.Forms;
 using ETAB_Automation.Core;
 using ETAB_Automation.Importers;
 using ETAB_Automation.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
 
 namespace ETAB_Automation
 {
@@ -369,7 +38,8 @@ namespace ETAB_Automation
                         "You can now:\n" +
                         "• Import CAD files\n" +
                         "• Configure building parameters\n" +
-                        "• Define concrete grade schedules\n\n" +
+                        "• Define concrete grade schedules\n" +
+                        "• Set per-floor beam and slab specifications\n\n" +
                         "Click 'Import CAD Files' to begin.",
                         "Connection Success",
                         MessageBoxButtons.OK,
@@ -394,7 +64,7 @@ namespace ETAB_Automation
             {
                 MessageBox.Show(
                     $"❌ Error connecting to ETABS:\n\n{ex.Message}\n\n" +
-                    "Stack Trace:\n{ex.StackTrace}",
+                    $"Stack Trace:\n{ex.StackTrace}",
                     "Connection Exception",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -435,13 +105,11 @@ namespace ETAB_Automation
                     }
 
                     // ============================================================
-                    // COLLECT CONFIGURATION DATA
+                    // COLLECT CONFIGURATION DATA FROM FORM
                     // ============================================================
 
                     var floorConfigs = importForm.FloorConfigs;
                     string seismicZone = importForm.SeismicZone;
-                    var beamDepths = importForm.BeamDepths;
-                    var slabThicknesses = importForm.SlabThicknesses;
                     var wallGrades = importForm.WallGrades;
                     var floorsPerGrade = importForm.FloorsPerGrade;
 
@@ -487,13 +155,34 @@ namespace ETAB_Automation
                     }
 
                     // ============================================================
+                    // VALIDATE FLOOR CONFIGURATIONS
+                    // ============================================================
+
+                    foreach (var config in floorConfigs)
+                    {
+                        if (!ValidateFloorConfig(config))
+                        {
+                            MessageBox.Show(
+                                $"❌ Invalid configuration for {config.Name}\n\n" +
+                                $"Please ensure:\n" +
+                                $"• CAD file is selected\n" +
+                                $"• Layer mappings are defined\n" +
+                                $"• Beam depths are configured\n" +
+                                $"• Slab thicknesses are configured",
+                                "Validation Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+
+                    // ============================================================
                     // SHOW FINAL CONFIRMATION
                     // ============================================================
 
                     string confirmationMsg = BuildConfirmationMessage(
-                        totalStories, totalHeight, seismicZone,
-                        beamDepths, slabThicknesses,
-                        wallGrades, floorsPerGrade, floorConfigs);
+                        floorConfigs, totalStories, totalHeight, seismicZone,
+                        wallGrades, floorsPerGrade);
 
                     var confirmResult = MessageBox.Show(
                         confirmationMsg,
@@ -516,7 +205,7 @@ namespace ETAB_Automation
                     System.Diagnostics.Debug.WriteLine($"Total Height: {totalHeight:F2}m");
                     System.Diagnostics.Debug.WriteLine($"Seismic Zone: {seismicZone}");
 
-                    // Create importer with grade schedule support
+                    // Create importer with enhanced per-floor configuration support
                     CADImporterEnhanced importer = new CADImporterEnhanced(etabs.SapModel);
 
                     bool success = importer.ImportMultiFloorTypeCAD(
@@ -524,8 +213,6 @@ namespace ETAB_Automation
                         storyHeights,
                         storyNames,
                         seismicZone,
-                        beamDepths,
-                        slabThicknesses,
                         wallGrades,
                         floorsPerGrade);
 
@@ -536,8 +223,7 @@ namespace ETAB_Automation
                     if (success)
                     {
                         ShowSuccessMessage(
-                            totalStories, totalHeight, seismicZone,
-                            beamDepths, slabThicknesses,
+                            floorConfigs, totalStories, totalHeight, seismicZone,
                             wallGrades, floorsPerGrade);
                     }
                     else
@@ -632,7 +318,7 @@ namespace ETAB_Automation
                     return "EDeck";
 
                 case "Typical":
-                    return $"story{index + 1:D2}"; // F01, F02, F03, etc.
+                    return $"story{index + 1:D2}"; // story01, story02, story03, etc.
 
                 case "Terrace":
                     return "Terrace";
@@ -643,68 +329,148 @@ namespace ETAB_Automation
         }
 
         /// <summary>
+        /// Validate that a floor configuration has all required data
+        /// </summary>
+        private bool ValidateFloorConfig(FloorTypeConfig config)
+        {
+            // Check CAD file
+            if (string.IsNullOrEmpty(config.CADFilePath))
+                return false;
+
+            // Check layer mappings
+            if (config.LayerMapping == null || config.LayerMapping.Count == 0)
+                return false;
+
+            // Check beam depths
+            if (config.BeamDepths == null || config.BeamDepths.Count == 0)
+                return false;
+
+            // Check slab thicknesses
+            if (config.SlabThicknesses == null || config.SlabThicknesses.Count == 0)
+                return false;
+
+            // Validate required beam depth keys
+            string[] requiredBeamKeys = {
+                "InternalGravity", "CantileverGravity", "CoreMain",
+                "PeripheralDeadMain", "PeripheralPortalMain", "InternalMain"
+            };
+
+            foreach (string key in requiredBeamKeys)
+            {
+                if (!config.BeamDepths.ContainsKey(key))
+                    return false;
+            }
+
+            // Validate required slab thickness keys
+            string[] requiredSlabKeys = { "Lobby", "Stair" };
+
+            foreach (string key in requiredSlabKeys)
+            {
+                if (!config.SlabThicknesses.ContainsKey(key))
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Build confirmation message with all configuration details
         /// </summary>
-        private string BuildConfirmationMessage(
-            int totalStories, double totalHeight, string seismicZone,
-            Dictionary<string, int> beamDepths, Dictionary<string, int> slabThicknesses,
-            List<string> wallGrades, List<int> floorsPerGrade,
-            List<FloorTypeConfig> floorConfigs)
+        //private string BuildConfirmationMessage(
+        //    List<FloorTypeConfig> floorConfigs,
+        //    int totalStories,
+        //    double totalHeight,
+        //    string seismicZone,
+        //    List<string> wallGrades,
+        //    List<int> floorsPerGrade)
+        //{
+        //    var msg = new System.Text.StringBuilder();
+
+        //    msg.AppendLine("═══════════════════════════════════════════════");
+        //    msg.AppendLine("           IMPORT CONFIGURATION REVIEW");
+        //    msg.AppendLine("═══════════════════════════════════════════════\n");
+
+        //    // Building summary
+        //    msg.AppendLine("🏢 BUILDING STRUCTURE:");
+        //    msg.AppendLine($"   Total Stories: {totalStories}");
+        //    msg.AppendLine($"   Total Height: {totalHeight:F2}m");
+        //    msg.AppendLine($"   Seismic Zone: {seismicZone}\n");
+
+        //    // Floor breakdown
+        //    msg.AppendLine("📊 FLOOR BREAKDOWN:");
+        //    foreach (var config in floorConfigs)
+        //    {
+        //        msg.AppendLine($"   • {config.Name}: {config.Count} floor(s) × {config.Height:F2}m = {config.Count * config.Height:F2}m");
+        //    }
+        //    msg.AppendLine();
+
+        //    // Per-floor configurations
+        //    msg.AppendLine("🔧 PER-FLOOR TYPE CONFIGURATIONS:");
+        //    int gravityWidth = (seismicZone == "Zone II" || seismicZone == "Zone III") ? 200 : 240;
+
+        //    foreach (var config in floorConfigs)
+        //    {
+        //        msg.AppendLine($"\n   {config.Name}:");
+
+        //        // Beam configuration for this floor
+        //        msg.AppendLine($"      Gravity Beams ({gravityWidth}mm width):");
+        //        msg.AppendLine($"         Internal: {config.BeamDepths["InternalGravity"]}mm depth");
+        //        msg.AppendLine($"         Cantilever: {config.BeamDepths["CantileverGravity"]}mm depth");
+
+        //        msg.AppendLine($"      Main Beams (Seismic):");
+        //        msg.AppendLine($"         Core: {config.BeamDepths["CoreMain"]}mm");
+        //        msg.AppendLine($"         Peripheral Dead: {config.BeamDepths["PeripheralDeadMain"]}mm");
+        //        msg.AppendLine($"         Peripheral Portal: {config.BeamDepths["PeripheralPortalMain"]}mm");
+        //        msg.AppendLine($"         Internal: {config.BeamDepths["InternalMain"]}mm");
+
+        //        // Slab configuration for this floor
+        //        msg.AppendLine($"      Slabs:");
+        //        msg.AppendLine($"         Lobby: {config.SlabThicknesses["Lobby"]}mm");
+        //        msg.AppendLine($"         Stair: {config.SlabThicknesses["Stair"]}mm");
+        //        msg.AppendLine($"         Regular: 125-250mm (area-based)");
+        //    }
+        //    msg.AppendLine();
+
+        //    // Concrete grade schedule
+        //    msg.AppendLine("🏗️ CONCRETE GRADE SCHEDULE:");
+        //    int floorStart = 1;
+        //    for (int i = 0; i < wallGrades.Count; i++)
+        //    {
+        //        int floorEnd = floorStart + floorsPerGrade[i] - 1;
+        //        string beamSlabGrade = CalculateBeamSlabGrade(wallGrades[i]);
+        //        msg.AppendLine($"   Floors {floorStart:D2}-{floorEnd:D2}: Wall {wallGrades[i]}, Beam/Slab {beamSlabGrade}");
+        //        floorStart = floorEnd + 1;
+        //    }
+
+        //    msg.AppendLine("\n═══════════════════════════════════════════════");
+        //    msg.AppendLine("         Proceed with ETABS import?");
+        //    msg.AppendLine("═══════════════════════════════════════════════");
+
+        //    return msg.ToString();
+        //}
+        private string BuildConfirmationMessage(List<FloorTypeConfig> floorConfigs, int totalStories,
+            double totalHeight, string seismicZone, List<string> wallGrades, List<int> floorsPerGrade)
         {
-            var msg = new System.Text.StringBuilder();
+            var msg = new StringBuilder();
+            msg.AppendLine($"{totalStories} floors | {totalHeight:F2}m | Zone {seismicZone}\n");
 
-            msg.AppendLine("═══════════════════════════════════════════════");
-            msg.AppendLine("           IMPORT CONFIGURATION REVIEW");
-            msg.AppendLine("═══════════════════════════════════════════════\n");
+            foreach (var c in floorConfigs)
+                msg.AppendLine($"{c.Name}: {c.Count}×{c.Height:F2}m | " +
+                    $"Beams {c.BeamDepths["InternalGravity"]}/{c.BeamDepths["CoreMain"]}mm | " +
+                    $"Slab {c.SlabThicknesses["Lobby"]}/{c.SlabThicknesses["Stair"]}mm");
 
-            // Building summary
-            msg.AppendLine("🏢 BUILDING STRUCTURE:");
-            msg.AppendLine($"   Total Stories: {totalStories}");
-            msg.AppendLine($"   Total Height: {totalHeight:F2}m");
-            msg.AppendLine($"   Seismic Zone: {seismicZone}\n");
-
-            // Floor breakdown
-            msg.AppendLine("📊 FLOOR BREAKDOWN:");
-            foreach (var config in floorConfigs)
-            {
-                msg.AppendLine($"   • {config.Name}: {config.Count} floor(s) × {config.Height:F2}m = {config.Count * config.Height:F2}m");
-            }
             msg.AppendLine();
-
-            // Beam configuration
-            int gravityWidth = (seismicZone == "Zone II" || seismicZone == "Zone III") ? 200 : 240;
-            msg.AppendLine("🔨 BEAM CONFIGURATION:");
-            msg.AppendLine($"   Gravity Beams (Width: {gravityWidth}mm):");
-            msg.AppendLine($"      • Internal: {gravityWidth}×{beamDepths["InternalGravity"]}mm");
-            msg.AppendLine($"      • Cantilever: {gravityWidth}×{beamDepths["CantileverGravity"]}mm");
-            msg.AppendLine($"   Main Beams (Seismic):");
-            msg.AppendLine($"      • Core: {beamDepths["CoreMain"]}mm depth");
-            msg.AppendLine($"      • Peripheral: {beamDepths["PeripheralDeadMain"]}mm depth\n");
-
-            // Slab configuration
-            msg.AppendLine("📐 SLAB CONFIGURATION:");
-            msg.AppendLine($"   • Lobby: {slabThicknesses["Lobby"]}mm");
-            msg.AppendLine($"   • Stair: {slabThicknesses["Stair"]}mm");
-            msg.AppendLine($"   • Regular: 125-250mm (area-based)\n");
-
-            // Concrete grade schedule
-            msg.AppendLine("🏗️ CONCRETE GRADE SCHEDULE:");
             int floorStart = 1;
             for (int i = 0; i < wallGrades.Count; i++)
             {
                 int floorEnd = floorStart + floorsPerGrade[i] - 1;
-                string beamSlabGrade = CalculateBeamSlabGrade(wallGrades[i]);
-                msg.AppendLine($"   Floors {floorStart:D2}-{floorEnd:D2}: Wall {wallGrades[i]}, Beam/Slab {beamSlabGrade}");
+                msg.AppendLine($"F{floorStart:D2}-F{floorEnd:D2}: {wallGrades[i]}/{CalculateBeamSlabGrade(wallGrades[i])}");
                 floorStart = floorEnd + 1;
             }
 
-            msg.AppendLine("\n═══════════════════════════════════════════════");
-            msg.AppendLine("         Proceed with ETABS import?");
-            msg.AppendLine("═══════════════════════════════════════════════");
-
+            msg.AppendLine("\nProceed with ETABS import?");
             return msg.ToString();
         }
-
         /// <summary>
         /// Calculate beam/slab grade from wall grade (0.7× formula)
         /// </summary>
@@ -726,50 +492,72 @@ namespace ETAB_Automation
         /// <summary>
         /// Show success message with import summary
         /// </summary>
-        private void ShowSuccessMessage(
-            int totalStories, double totalHeight, string seismicZone,
-            Dictionary<string, int> beamDepths, Dictionary<string, int> slabThicknesses,
-            List<string> wallGrades, List<int> floorsPerGrade)
+        //private void ShowSuccessMessage(
+        //    List<FloorTypeConfig> floorConfigs,
+        //    int totalStories,
+        //    double totalHeight,
+        //    string seismicZone,
+        //    List<string> wallGrades,
+        //    List<int> floorsPerGrade)
+        //{
+        //    var msg = new System.Text.StringBuilder();
+
+        //    msg.AppendLine("═══════════════════════════════════════════════");
+        //    msg.AppendLine("        ✅ IMPORT COMPLETED SUCCESSFULLY!");
+        //    msg.AppendLine("═══════════════════════════════════════════════\n");
+
+        //    msg.AppendLine("🏢 BUILDING STRUCTURE CREATED:");
+        //    msg.AppendLine($"   • Total Stories: {totalStories}");
+        //    msg.AppendLine($"   • Building Height: {totalHeight:F2}m");
+        //    msg.AppendLine($"   • Seismic Zone: {seismicZone}\n");
+
+        //    msg.AppendLine("✅ FLOOR TYPES IMPORTED:");
+        //    foreach (var config in floorConfigs)
+        //    {
+        //        msg.AppendLine($"   • {config.Name}: {config.Count} floor(s) with custom beam/slab config");
+        //    }
+        //    msg.AppendLine();
+
+        //    msg.AppendLine("🏗️ CONCRETE GRADE SCHEDULE APPLIED:");
+        //    int floorStart = 1;
+        //    for (int i = 0; i < wallGrades.Count; i++)
+        //    {
+        //        int floorEnd = floorStart + floorsPerGrade[i] - 1;
+        //        string beamSlabGrade = CalculateBeamSlabGrade(wallGrades[i]);
+        //        msg.AppendLine($"   F{floorStart:D2}-F{floorEnd:D2}: {wallGrades[i]}/{beamSlabGrade}");
+        //        floorStart = floorEnd + 1;
+        //    }
+
+        //    msg.AppendLine("\n📋 NEXT STEPS:");
+        //    msg.AppendLine("   1. Check ETABS window for your model");
+        //    msg.AppendLine("   2. Use story dropdown to navigate floors");
+        //    msg.AppendLine("   3. Review sections and materials");
+        //    msg.AppendLine("   4. Verify per-floor beam and slab assignments");
+        //    msg.AppendLine("   5. Run analysis when ready\n");
+
+        //    msg.AppendLine("═══════════════════════════════════════════════");
+
+        //    MessageBox.Show(
+        //        msg.ToString(),
+        //        "Import Success",
+        //        MessageBoxButtons.OK,
+        //        MessageBoxIcon.Information);
+        //}
+        private void ShowSuccessMessage(List<FloorTypeConfig> floorConfigs, int totalStories,
+    double totalHeight, string seismicZone, List<string> wallGrades, List<int> floorsPerGrade)
         {
-            var msg = new System.Text.StringBuilder();
+            var msg = new StringBuilder();
+            msg.AppendLine($"✅ {totalStories} floors | {totalHeight:F2}m | Zone {seismicZone}\n");
 
-            msg.AppendLine("═══════════════════════════════════════════════");
-            msg.AppendLine("        ✅ IMPORT COMPLETED SUCCESSFULLY!");
-            msg.AppendLine("═══════════════════════════════════════════════\n");
-
-            msg.AppendLine("🏢 BUILDING STRUCTURE CREATED:");
-            msg.AppendLine($"   • Total Stories: {totalStories}");
-            msg.AppendLine($"   • Building Height: {totalHeight:F2}m");
-            msg.AppendLine($"   • Seismic Zone: {seismicZone}\n");
-
-            msg.AppendLine("✅ STRUCTURAL ELEMENTS IMPORTED:");
-            msg.AppendLine("   • Walls with auto-thickness calculation");
-            msg.AppendLine("   • Beams with zone-based sizing");
-            msg.AppendLine("   • Slabs with area/span-based rules\n");
-
-            msg.AppendLine("🏗️ CONCRETE GRADE SCHEDULE APPLIED:");
             int floorStart = 1;
             for (int i = 0; i < wallGrades.Count; i++)
             {
                 int floorEnd = floorStart + floorsPerGrade[i] - 1;
-                string beamSlabGrade = CalculateBeamSlabGrade(wallGrades[i]);
-                msg.AppendLine($"   F{floorStart:D2}-F{floorEnd:D2}: {wallGrades[i]}/{beamSlabGrade}");
+                msg.AppendLine($"F{floorStart:D2}-F{floorEnd:D2}: {wallGrades[i]}/{CalculateBeamSlabGrade(wallGrades[i])}");
                 floorStart = floorEnd + 1;
             }
 
-            msg.AppendLine("\n📋 NEXT STEPS:");
-            msg.AppendLine("   1. Check ETABS window for your model");
-            msg.AppendLine("   2. Use story dropdown to navigate floors");
-            msg.AppendLine("   3. Review sections and materials");
-            msg.AppendLine("   4. Run analysis when ready\n");
-
-            msg.AppendLine("═══════════════════════════════════════════════");
-
-            MessageBox.Show(
-                msg.ToString(),
-                "Import Success",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            MessageBox.Show(msg.ToString(), "Import Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 }
