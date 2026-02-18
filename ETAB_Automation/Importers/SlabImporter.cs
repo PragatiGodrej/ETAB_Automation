@@ -280,40 +280,7 @@ namespace ETABS_CAD_Automation.Importers
         /// <summary>
         /// ✅ CORRECTED: Calculate cantilever span as perpendicular distance from support edge to free edge
         /// </summary>
-        //private double CalculateCantileverSpan(List<netDxf.Vector2> points)
-        //{
-        //    if (points.Count < 3) return 0;
-
-        //    // Strategy: Find the support edge (typically the longest edge or edge closest to building)
-        //    // Then calculate perpendicular distance from that edge to the farthest point
-
-        //    double maxSpan = 0;
-
-        //    // Try each edge as potential support edge
-        //    for (int i = 0; i < points.Count; i++)
-        //    {
-        //        int j = (i + 1) % points.Count;
-
-        //        var p1 = points[i];
-        //        var p2 = points[j];
-
-        //        // Calculate perpendicular distance from this edge to all other points
-        //        for (int k = 0; k < points.Count; k++)
-        //        {
-        //            if (k == i || k == j) continue;
-
-        //            var p = points[k];
-
-        //            // Calculate perpendicular distance from point p to line segment (p1, p2)
-        //            double span = PerpendicularDistanceToLineSegment(p, p1, p2);
-
-        //            if (span > maxSpan)
-        //                maxSpan = span;
-        //        }
-        //    }
-
-        //    return maxSpan * MM_TO_M;
-        //}
+       
         private double CalculateCantileverSpan(List<netDxf.Vector2> points)
         {
             if (points.Count < 3) return 0;

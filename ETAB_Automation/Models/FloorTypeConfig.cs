@@ -61,6 +61,35 @@ namespace ETAB_Automation.Models
         public Dictionary<string, int> SlabThicknesses { get; set; }
 
         /// <summary>
+        /// Indicates if this floor represents an individual basement level
+        /// True for: Basement1, Basement2, Basement3, Basement4, Basement5
+        /// False for: Podium, Ground, EDeck, Typical, Terrace
+        /// </summary>
+        public bool IsIndividualBasement
+        {
+            get
+            {
+                return Name != null && Name.StartsWith("Basement") &&
+                       Name.Length > 8 && char.IsDigit(Name[8]);
+            }
+        }
+        /// <summary>
+        /// Gets the basement floor number if this is an individual basement
+        /// Returns: 1-5 for Basement1-Basement5, 0 otherwise
+        /// </summary>
+        public int BasementNumber
+        {
+            get
+            {
+                if (IsIndividualBasement && Name.Length > 8)
+                {
+                    if (int.TryParse(Name.Substring(8), out int num))
+                        return num;
+                }
+                return 0;
+            }
+        }
+        /// <summary>
         /// Default constructor - initializes empty collections
         /// </summary>
         public FloorTypeConfig()

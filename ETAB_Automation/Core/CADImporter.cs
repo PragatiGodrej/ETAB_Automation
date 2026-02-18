@@ -1,13 +1,8 @@
 ﻿
-
-
 // ============================================================================
-// FILE: Importers/CADImporterEnhanced.cs (UPDATED - PER-FLOOR-TYPE CONFIG)
+// FILE: Importers/CADImporterEnhanced.cs — VERSION 3.2 (CORRECTED INNER LOOP)
 // ============================================================================
-// PURPOSE: Enhanced CAD importer with per-floor-type beam and slab configuration
-//          Each floor type (Basement, Podium, EDeck, Typical, Terrace) can have
-//          its own unique beam depths and slab thicknesses
-// VERSION: 3.0 (Per-Floor Configuration Support)
+
 // ============================================================================
 
 using ETAB_Automation.Models;
@@ -24,13 +19,6 @@ using System.Windows.Forms;
 
 namespace ETAB_Automation.Core
 {
-    /// <summary>
-    /// Enhanced CAD importer that supports:
-    /// - Multiple floor types with different configurations
-    /// - Per-floor-type beam depths and slab thicknesses
-    /// - Concrete grade schedules
-    /// - Seismic zone-based design rules
-    /// </summary>
     public class CADImporterEnhanced
     {
         private cSapModel sapModel;
@@ -42,412 +30,343 @@ namespace ETAB_Automation.Core
             storyManager = new StoryManager(model);
         }
 
-        /// <summary>
-        /// Import multiple floor types with per-floor-type configurations
-        /// </summary>
-        /// <param name="floorConfigs">List of floor configurations (each contains beam/slab data)</param>
-        /// <param name="storyHeights">Story heights in meters</param>
-        /// <param name="storyNames">Story names</param>
-        /// <param name="seismicZone">Seismic zone (Zone II, III, IV, or V)</param>
-        /// <param name="wallGrades">Wall concrete grades</param>
-        /// <param name="floorsPerGrade">Floors per grade segment</param>
-        /// <returns>True if import successful</returns>
         public bool ImportMultiFloorTypeCAD(
             List<FloorTypeConfig> floorConfigs,
             List<double> storyHeights,
             List<string> storyNames,
             string seismicZone,
             List<string> wallGrades,
-            List<int> floorsPerGrade)
+            List<int> floorsPerGrade,
+            double foundationHeight = 0.0)
         {
             try
             {
                 Debug.WriteLine("\n╔════════════════════════════════════════════════════╗");
-                Debug.WriteLine("║     CAD IMPORTER - PER-FLOOR CONFIGURATION         ║");
+                Debug.WriteLine("║  CAD IMPORTER v3.2 FIXED — CORRECT ELEVATIONS     ║");
                 Debug.WriteLine("╚════════════════════════════════════════════════════╝\n");
 
-                // Unlock model
                 sapModel.SetModelIsLocked(false);
-
-                // Set unit context to N_m_C (Newtons, meters, Celsius)
-                eUnits previousUnits = sapModel.GetPresentUnits();
-                Debug.WriteLine($"⚙️  Setting units from {previousUnits} to N_m_C");
                 sapModel.SetPresentUnits(eUnits.N_m_C);
 
-                // Create grade schedule manager
-                GradeScheduleManager gradeSchedule = new GradeScheduleManager(wallGrades, floorsPerGrade);
-
-                // Validate grade schedule
+                var gradeSchedule = new GradeScheduleManager(wallGrades, floorsPerGrade);
                 int totalStories = storyHeights.Count;
+
                 if (!gradeSchedule.ValidateTotalFloors(totalStories))
                 {
                     MessageBox.Show(
                         $"❌ Grade schedule floor count doesn't match!\n\n" +
                         $"Expected: {totalStories}\nGot: {floorsPerGrade.Sum()}",
-                        "Configuration Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
+                        "Configuration Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return false;
                 }
 
-                // Calculate total typical floors
                 int totalTypicalFloors = CalculateTotalTypicalFloors(floorConfigs);
 
-                // Show design notes
-                ShowDesignNotes(floorConfigs, totalTypicalFloors, seismicZone, gradeSchedule);
+                ShowDesignNotes(floorConfigs, totalTypicalFloors, seismicZone,
+                                gradeSchedule, foundationHeight);
 
-                // Define stories
+                // Pass foundationHeight so all story base elevations are offset
+                // above the foundation. Foundation walls (0 → foundationHeight)
+                // are imported separately below and do NOT occupy a story slot.
                 Debug.WriteLine("\n📐 Creating building stories...");
-                storyManager.DefineStoriesWithCustomNames(storyHeights, storyNames);
+                storyManager.DefineStoriesWithCustomNames(storyHeights, storyNames, foundationHeight);
 
-                // Load wall sections
-                Debug.WriteLine("🧱 Loading available wall sections...");
                 WallThicknessCalculator.LoadAvailableWallSections(sapModel);
 
                 // ============================================================
-                // IMPORT EACH FLOOR TYPE WITH ITS UNIQUE CONFIGURATION
+                // FOUNDATION WALLS (walls only — no beams, no slabs)
                 // ============================================================
+                if (foundationHeight > 0)
+                {
+                    Debug.WriteLine($"\n╔═══════════════════════════════════════╗");
+                    Debug.WriteLine($"║  FOUNDATION WALLS: {foundationHeight:F2}m".PadRight(41) + "║");
+                    Debug.WriteLine($"╚═══════════════════════════════════════╝");
 
+                    var firstBasement = floorConfigs.FirstOrDefault(
+                        c => c.IsIndividualBasement && c.BasementNumber == 1);
+
+                    if (firstBasement == null)
+                    {
+                        MessageBox.Show(
+                            "⚠️ Foundation height specified but no Basement1 found.\n\n" +
+                            "Foundation walls require a Basement1 floor.",
+                            "Configuration Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        DxfDocument foundationDxf = DxfDocument.Load(firstBasement.CADFilePath);
+                        if (foundationDxf == null)
+                        {
+                            MessageBox.Show(
+                                $"❌ Failed to load CAD file for foundation walls\n\n" +
+                                $"File: {firstBasement.CADFilePath}",
+                                "CAD Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return false;
+                        }
+
+                        var foundationWallImporter = new WallImporterEnhanced(
+                            sapModel,
+                            foundationDxf,
+                            foundationHeight,   // ← correct: foundation's own height
+                            totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
+                            seismicZone,
+                            gradeSchedule);
+
+                        foundationWallImporter.ImportWalls(
+                            firstBasement.LayerMapping,
+                            0.0,   // base of building
+                            0);    // story index 0 for grade lookup
+
+                        Debug.WriteLine("   ✓ Foundation walls created");
+                        sapModel.View.RefreshView(0, false);
+                    }
+                }
+
+                // ============================================================
+                // IMPORT EACH FLOOR TYPE
+                // ============================================================
+                // Foundation walls do NOT consume a story slot.
+                // StoryManager already offsets ALL story base elevations upward
+                // by foundationHeight (cumulativeHeight starts at foundationHeight).
+                //
+                // Result:
+                //   Foundation walls : 0.0             → foundationHeight  (walls only)
+                //   Basement1 walls  : foundationHeight → foundationHeight + B1height
+                //   NO GAP, NO SKIP — always start at index 0.
                 int currentStoryIndex = 0;
 
                 foreach (var floorConfig in floorConfigs)
                 {
-                    Debug.WriteLine($"\n╔════════════════════════════════════════════════════╗");
-                    Debug.WriteLine($"║  FLOOR TYPE: {floorConfig.Name.ToUpper().PadRight(40)} ║");
-                    Debug.WriteLine($"╚════════════════════════════════════════════════════╝");
+                    Debug.WriteLine($"\n╔═══════════════════════════════════════╗");
+                    Debug.WriteLine($"║  FLOOR TYPE: {floorConfig.Name.ToUpper().PadRight(27)}║");
+                    Debug.WriteLine($"╚═══════════════════════════════════════╝");
 
-                    // Load CAD file for this floor type
                     DxfDocument dxfDoc = DxfDocument.Load(floorConfig.CADFilePath);
                     if (dxfDoc == null)
                     {
                         MessageBox.Show(
                             $"❌ Failed to load CAD file for {floorConfig.Name}\n\n" +
                             $"File: {floorConfig.CADFilePath}",
-                            "CAD Load Error",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
+                            "CAD Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return false;
                     }
 
-                    Debug.WriteLine($"✓ CAD file loaded: {System.IO.Path.GetFileName(floorConfig.CADFilePath)}");
-                    Debug.WriteLine($"   Floors: {floorConfig.Count}");
-                    Debug.WriteLine($"   Height: {floorConfig.Height:F2}m each");
+                    Debug.WriteLine($"✓ Loaded: {System.IO.Path.GetFileName(floorConfig.CADFilePath)}");
 
-                    // Display beam configuration for this floor type
-                    Debug.WriteLine($"\n🔧 Beam Configuration for {floorConfig.Name}:");
-                    int gravityWidth = (seismicZone == "Zone II" || seismicZone == "Zone III") ? 200 : 240;
-                    Debug.WriteLine($"   Gravity Beams ({gravityWidth}mm width):");
-                    Debug.WriteLine($"      - Internal: {floorConfig.BeamDepths["InternalGravity"]}mm");
-                    Debug.WriteLine($"      - Cantilever: {floorConfig.BeamDepths["CantileverGravity"]}mm");
-                    Debug.WriteLine($"   Main Beams (width matches wall):");
-                    Debug.WriteLine($"      - Core: {floorConfig.BeamDepths["CoreMain"]}mm");
-                    Debug.WriteLine($"      - Peripheral Dead: {floorConfig.BeamDepths["PeripheralDeadMain"]}mm");
-                    Debug.WriteLine($"      - Peripheral Portal: {floorConfig.BeamDepths["PeripheralPortalMain"]}mm");
-                    Debug.WriteLine($"      - Internal: {floorConfig.BeamDepths["InternalMain"]}mm");
+                    // Beam and slab importers are floor-type-scoped (no per-floor state)
+                    var beamImporter = new BeamImporterEnhanced(
+                        sapModel, dxfDoc, seismicZone,
+                        totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
+                        floorConfig.BeamDepths, gradeSchedule);
 
-                    // Display slab configuration for this floor type
-                    Debug.WriteLine($"\n📐 Slab Configuration for {floorConfig.Name}:");
-                    Debug.WriteLine($"   - Lobby: {floorConfig.SlabThicknesses["Lobby"]}mm");
-                    Debug.WriteLine($"   - Stair: {floorConfig.SlabThicknesses["Stair"]}mm");
-                    Debug.WriteLine($"   - Regular: 125-250mm (area-based)");
+                    var slabImporter = new SlabImporterEnhanced(
+                        sapModel, dxfDoc,
+                        floorConfig.SlabThicknesses, gradeSchedule);
 
-                    // Create importers with THIS FLOOR TYPE'S configuration
-                    BeamImporterEnhanced beamImporter = new BeamImporterEnhanced(
-                        sapModel,
-                        dxfDoc,
-                        seismicZone,
-                        totalTypicalFloors,
-                        floorConfig.BeamDepths,  // ⭐ USE FLOOR-SPECIFIC BEAM DEPTHS
-                        gradeSchedule);
-
-                    WallImporterEnhanced wallImporter = new WallImporterEnhanced(
-                        sapModel,
-                        dxfDoc,
-                        floorConfig.Height,
-                        totalTypicalFloors,
-                        seismicZone,
-                        gradeSchedule);
-
-                    SlabImporterEnhanced slabImporter = new SlabImporterEnhanced(
-                        sapModel,
-                        dxfDoc,
-                        floorConfig.SlabThicknesses,  // ⭐ USE FLOOR-SPECIFIC SLAB THICKNESSES
-                        gradeSchedule);
-
-                    // Import each floor of this type
                     Debug.WriteLine($"\n📥 Importing {floorConfig.Count} floor(s) of {floorConfig.Name}:");
 
                     for (int floor = 0; floor < floorConfig.Count; floor++)
                     {
-                        // ✅ BOUNDS CHECK
                         if (currentStoryIndex >= totalStories)
                         {
                             MessageBox.Show(
-                                $"❌ ERROR: Story index out of bounds!\n\n" +
-                                $"Trying to access story {currentStoryIndex} but only {totalStories} stories exist.\n" +
-                                $"Floor config: {floorConfig.Name}, floor {floor + 1}/{floorConfig.Count}",
-                                "Index Error",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error);
+                                $"❌ Story index out of bounds!\n\n" +
+                                $"Story {currentStoryIndex} does not exist (total: {totalStories}).\n" +
+                                $"Floor config: {floorConfig.Name} floor {floor + 1}/{floorConfig.Count}",
+                                "Index Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             return false;
                         }
 
-                        string currentStoryName = storyNames[currentStoryIndex];
-                        Debug.WriteLine($"   [{floor + 1}/{floorConfig.Count}] {currentStoryName} (Index: {currentStoryIndex})");
-
-                        // Get elevations
                         double baseElevation = storyManager.GetStoryBaseElevation(currentStoryIndex);
                         double topElevation = storyManager.GetStoryTopElevation(currentStoryIndex);
+                        double thisFloorHeight = topElevation - baseElevation;
 
-                        // Get concrete grade for this floor
                         string wallGrade = gradeSchedule.GetWallGrade(currentStoryIndex);
                         string beamSlabGrade = gradeSchedule.GetBeamSlabGrade(currentStoryIndex);
-                        Debug.WriteLine($"       Concrete: Wall={wallGrade}, Beam/Slab={beamSlabGrade}");
-                        Debug.WriteLine($"       Elevation: {baseElevation:F2}m - {topElevation:F2}m");
 
-                        // Import structural elements
+                        Debug.WriteLine($"\n   [{floor + 1}/{floorConfig.Count}] " +
+                                        $"{storyNames[currentStoryIndex]} (idx {currentStoryIndex})");
+                        Debug.WriteLine($"       Grade : Wall={wallGrade}, Beam/Slab={beamSlabGrade}");
+                        Debug.WriteLine($"       Base  : {baseElevation:F3}m");
+                        Debug.WriteLine($"       Top   : {topElevation:F3}m");
+                        Debug.WriteLine($"       Height: {thisFloorHeight:F3}m");
+                        Debug.WriteLine($"\n       Placement:");
+                        Debug.WriteLine($"         Walls  → base={baseElevation:F3}m, " +
+                                        $"height={thisFloorHeight:F3}m (rises to {topElevation:F3}m)");
+                        Debug.WriteLine($"         Beams  → elevation={topElevation:F3}m  ← TOP of story");
+                        Debug.WriteLine($"         Slabs  → elevation={topElevation:F3}m  ← TOP of story");
+
+                        // --------------------------------------------------------
+                        // WallImporter is per-floor so thisFloorHeight is always
+                        // correct for this specific floor (BUG-6 from v3.1).
+                        // --------------------------------------------------------
+                        var wallImporter = new WallImporterEnhanced(
+                            sapModel, dxfDoc,
+                            thisFloorHeight,    // ← height of THIS floor only
+                            totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
+                            seismicZone,
+                            gradeSchedule);
+
+                        // Walls start at the BASE of the story
                         wallImporter.ImportWalls(
                             floorConfig.LayerMapping,
-                            baseElevation,
+                            baseElevation,       // ← bottom of wall
                             currentStoryIndex);
+
+                        // --------------------------------------------------------
+                        // BEAMS and SLABS are always placed at baseElevation.
+                        // The CAD floor plan represents the slab level at the
+                        // BASE of each story for all floor types.
+                        // Walls start at baseElevation and rise thisFloorHeight.
+                        // --------------------------------------------------------
+                        Debug.WriteLine($"         Beams  → {baseElevation:F3}m  (base of story)");
+                        Debug.WriteLine($"         Slabs  → {baseElevation:F3}m  (base of story)");
 
                         beamImporter.ImportBeams(
                             floorConfig.LayerMapping,
-                            topElevation,
+                            baseElevation,       // ← base of this story
                             currentStoryIndex);
 
                         slabImporter.ImportSlabs(
                             floorConfig.LayerMapping,
-                            topElevation,
+                            baseElevation,       // ← base of this story
                             currentStoryIndex);
 
                         currentStoryIndex++;
 
-                        // Refresh view periodically
                         if ((floor + 1) % 5 == 0)
-                        {
                             sapModel.View.RefreshView(0, false);
-                        }
                     }
 
                     Debug.WriteLine($"   ✓ Completed {floorConfig.Name}");
                     sapModel.View.RefreshView(0, false);
                 }
 
-                // Final view refresh
                 Debug.WriteLine("\n🔄 Final model refresh...");
                 sapModel.View.RefreshView(0, true);
 
-                // Show success summary
-                Debug.WriteLine("\n╔════════════════════════════════════════════════════╗");
-                Debug.WriteLine("║            IMPORT COMPLETED SUCCESSFULLY           ║");
-                Debug.WriteLine("╚════════════════════════════════════════════════════╝\n");
-
                 ShowImportSummary(floorConfigs, totalStories,
                     storyManager.GetTotalBuildingHeight(), totalTypicalFloors,
-                    seismicZone, gradeSchedule);
+                    seismicZone, gradeSchedule, foundationHeight);
 
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"\n❌ IMPORT FAILED: {ex.Message}");
-                Debug.WriteLine($"Stack Trace:\n{ex.StackTrace}");
-
+                Debug.WriteLine($"\n❌ IMPORT FAILED: {ex.Message}\n{ex.StackTrace}");
                 MessageBox.Show(
-                    $"❌ Import failed:\n\n{ex.Message}\n\n" +
-                    $"Stack Trace:\n{ex.StackTrace}",
-                    "Import Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    $"❌ Import failed:\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}",
+                    "Import Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
         }
 
-        /// <summary>
-        /// Calculate total number of typical floors
-        /// </summary>
+        // ====================================================================
+        // HELPERS
+        // ====================================================================
+
         private int CalculateTotalTypicalFloors(List<FloorTypeConfig> configs)
         {
-            foreach (var config in configs)
-            {
-                if (config.Name == "Typical")
-                    return config.Count;
-            }
-            // Fallback: sum all floors
-            return configs.Sum(c => c.Count);
+            foreach (var c in configs)
+                if (c.Name == "Typical") return c.Count;
+            return 0;
         }
 
-        /// <summary>
-        /// Show design configuration notes before import
-        /// </summary>
-        //private void ShowDesignNotes(
-        //    List<FloorTypeConfig> floorConfigs,
-        //    int totalTypicalFloors,
-        //    string seismicZone,
-        //    GradeScheduleManager gradeSchedule)
-        //{
-        //    StringBuilder notes = new StringBuilder();
-
-        //    notes.AppendLine("╔════════════════════════════════════════════════════╗");
-        //    notes.AppendLine("║       DESIGN CONFIGURATION SUMMARY                 ║");
-        //    notes.AppendLine("╚════════════════════════════════════════════════════╝\n");
-
-        //    notes.AppendLine($"🏗️  Seismic Zone: {seismicZone}");
-        //    notes.AppendLine($"📊  Total Typical Floors: {totalTypicalFloors}\n");
-
-        //    // Concrete grade schedule
-        //    notes.AppendLine("🏗️ CONCRETE GRADE SCHEDULE:");
-        //    foreach (var range in gradeSchedule.GetGradeRanges())
-        //    {
-        //        notes.AppendLine($"   Floors {range.StartFloor:D2}-{range.EndFloor:D2}: " +
-        //            $"Wall={range.WallGrade}, Beam/Slab={range.BeamSlabGrade}");
-        //    }
-        //    notes.AppendLine();
-
-        //    // Per-floor-type configurations
-        //    notes.AppendLine("🔧 PER-FLOOR-TYPE CONFIGURATIONS:\n");
-
-        //    int gravityWidth = seismicZone == "Zone II" || seismicZone == "Zone III" ? 200 : 240;
-
-        //    foreach (var config in floorConfigs)
-        //    {
-        //        notes.AppendLine($"   {config.Name} ({config.Count} floor(s)):");
-
-        //        notes.AppendLine($"      Beams:");
-        //        notes.AppendLine($"         Gravity ({gravityWidth}mm): Internal={config.BeamDepths["InternalGravity"]}mm, " +
-        //            $"Cantilever={config.BeamDepths["CantileverGravity"]}mm");
-        //        notes.AppendLine($"         Main: Core={config.BeamDepths["CoreMain"]}mm, " +
-        //            $"Peripheral={config.BeamDepths["PeripheralDeadMain"]}mm");
-
-        //        notes.AppendLine($"      Slabs:");
-        //        notes.AppendLine($"         Lobby={config.SlabThicknesses["Lobby"]}mm, " +
-        //            $"Stair={config.SlabThicknesses["Stair"]}mm, Regular=125-250mm\n");
-        //    }
-
-        //    // Wall thicknesses (estimated)
-        //    int coreThick = WallThicknessCalculator.GetRecommendedThickness(
-        //        totalTypicalFloors, WallThicknessCalculator.WallType.CoreWall,
-        //        seismicZone, 2.0, false);
-        //    int periThick = WallThicknessCalculator.GetRecommendedThickness(
-        //        totalTypicalFloors, WallThicknessCalculator.WallType.PeripheralDeadWall,
-        //        seismicZone, 2.0, false);
-
-        //    notes.AppendLine("🧱 ESTIMATED WALL THICKNESSES:");
-        //    notes.AppendLine($"   Core Walls: ~{coreThick}mm");
-        //    notes.AppendLine($"   Peripheral Walls: ~{periThick}mm");
-        //    notes.AppendLine($"   (Actual thickness determined by wall length)\n");
-
-        //    notes.AppendLine("╚════════════════════════════════════════════════════╝");
-        //    notes.AppendLine("   Units: All dimensions in METERS (N_m_C)");
-        //    notes.AppendLine("╚════════════════════════════════════════════════════╝");
-
-        //    var result = MessageBox.Show(
-        //        notes.ToString() + "\n\nProceed with import?",
-        //        "⚠️ Confirm Design Parameters",
-        //        MessageBoxButtons.YesNo,
-        //        MessageBoxIcon.Question);
-
-        //    if (result != DialogResult.Yes)
-        //    {
-        //        throw new Exception("Import cancelled by user");
-        //    }
-        //}
-        private void ShowDesignNotes(List<FloorTypeConfig> floorConfigs, int totalTypicalFloors,
-    string seismicZone, GradeScheduleManager gradeSchedule)
+        private void ShowDesignNotes(
+            List<FloorTypeConfig> floorConfigs, int totalTypicalFloors,
+            string seismicZone, GradeScheduleManager gradeSchedule,
+            double foundationHeight)
         {
             var msg = new StringBuilder();
-            msg.AppendLine($"Zone {seismicZone} | {totalTypicalFloors} typical floors\n");
+            msg.AppendLine("═══════════════════════════════════════");
+            msg.AppendLine($"Zone {seismicZone} | Building Configuration");
+            msg.AppendLine("═══════════════════════════════════════\n");
 
-            foreach (var r in gradeSchedule.GetGradeRanges())
-                msg.AppendLine($"F{r.StartFloor:D2}-F{r.EndFloor:D2}: {r.WallGrade}/{r.BeamSlabGrade}");
+            if (foundationHeight > 0)
+            {
+                msg.AppendLine($"🏗️ FOUNDATION:");
+                msg.AppendLine($"  Height: {foundationHeight:F2}m  (walls only — no beams/slabs)");
+                msg.AppendLine($"  CAD:    Using Basement1 plan");
+                msg.AppendLine();
+            }
 
-            msg.AppendLine();
+            msg.AppendLine("FLOOR BREAKDOWN:");
+            int basementCount = 0;
             foreach (var c in floorConfigs)
-                msg.AppendLine($"{c.Name} ({c.Count}f): " +
-                    $"Gravity {c.BeamDepths["InternalGravity"]}/{c.BeamDepths["CantileverGravity"]}mm | " +
-                    $"Main {c.BeamDepths["CoreMain"]}/{c.BeamDepths["PeripheralDeadMain"]}mm | " +
+            {
+                if (c.IsIndividualBasement)
+                {
+                    basementCount++;
+                    msg.AppendLine($"  B{c.BasementNumber} — {c.Name}: {c.Height:F2}m  (1 floor)");
+                }
+                else
+                    msg.AppendLine($"  {c.Name}: {c.Count} × {c.Height:F2}m");
+            }
+            if (basementCount > 0)
+                msg.AppendLine($"\n  Total Individual Basements: {basementCount}");
+
+            msg.AppendLine("\nCONCRETE GRADES:");
+            foreach (var r in gradeSchedule.GetGradeRanges())
+                msg.AppendLine($"  F{r.StartFloor + 1:D2}-F{r.EndFloor + 1:D2}: {r.WallGrade} / {r.BeamSlabGrade}");
+
+            msg.AppendLine("\nBEAM/SLAB CONFIG:");
+            foreach (var c in floorConfigs)
+            {
+                string prefix = c.IsIndividualBasement ? $"B{c.BasementNumber}" : c.Name;
+                msg.AppendLine($"  {prefix}: " +
+                    $"Grav {c.BeamDepths["InternalGravity"]}/{c.BeamDepths["CantileverGravity"]}mm | " +
+                    $"Main {c.BeamDepths["CoreMain"]}/{c.BeamDepths["PeripheralPortalMain"]}mm | " +
                     $"Slab {c.SlabThicknesses["Lobby"]}/{c.SlabThicknesses["Stair"]}mm");
+            }
 
+            int refFloors = totalTypicalFloors > 0 ? totalTypicalFloors : floorConfigs.Sum(c => c.Count);
             int coreThick = WallThicknessCalculator.GetRecommendedThickness(
-                totalTypicalFloors, WallThicknessCalculator.WallType.CoreWall, seismicZone, 2.0, false);
+                refFloors, WallThicknessCalculator.WallType.CoreWall, seismicZone, 2.0, false);
             int periThick = WallThicknessCalculator.GetRecommendedThickness(
-                totalTypicalFloors, WallThicknessCalculator.WallType.PeripheralDeadWall, seismicZone, 2.0, false);
+                refFloors, WallThicknessCalculator.WallType.PeripheralDeadWall, seismicZone, 2.0, false);
+            msg.AppendLine($"\nRECOMMENDED WALLS: Core ~{coreThick}mm | Peripheral ~{periThick}mm");
 
-            msg.AppendLine($"\nWalls: Core ~{coreThick}mm | Peripheral ~{periThick}mm");
+            msg.AppendLine("\n═══════════════════════════════════════");
 
-            if (MessageBox.Show(msg.ToString() + "\n\nProceed?", "Confirm",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (MessageBox.Show(msg.ToString() + "\n\nProceed with import?",
+                "Confirm Configuration", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+                != DialogResult.Yes)
                 throw new Exception("Import cancelled by user");
         }
-        /// <summary>
-        /// Show import summary after successful completion
-        /// </summary>
-        //private void ShowImportSummary(
-        //    List<FloorTypeConfig> configs,
-        //    int totalStories,
-        //    double totalHeight,
-        //    int typicalFloors,
-        //    string seismicZone,
-        //    GradeScheduleManager gradeSchedule)
-        //{
-        //    StringBuilder summary = new StringBuilder();
 
-        //    summary.AppendLine("╔════════════════════════════════════════════════════╗");
-        //    summary.AppendLine("║         IMPORT COMPLETED SUCCESSFULLY              ║");
-        //    summary.AppendLine("╚════════════════════════════════════════════════════╝\n");
-
-        //    summary.AppendLine("🏢 BUILDING STRUCTURE:");
-        //    summary.AppendLine($"   Total Stories: {totalStories}");
-        //    summary.AppendLine($"   Total Height: {totalHeight:F2}m");
-        //    summary.AppendLine($"   Seismic Zone: {seismicZone}\n");
-
-        //    summary.AppendLine("📊 FLOOR TYPE BREAKDOWN:");
-        //    foreach (var config in configs)
-        //    {
-        //        double typeHeight = config.Count * config.Height;
-        //        summary.AppendLine($"   • {config.Name}: {config.Count} floor(s) × {config.Height:F2}m = {typeHeight:F2}m");
-        //    }
-        //    summary.AppendLine();
-
-        //    summary.AppendLine("✅ IMPORTED WITH PER-FLOOR CONFIGURATION:");
-        //    summary.AppendLine($"   • {configs.Count} different floor types");
-        //    summary.AppendLine($"   • Each with unique beam depths");
-        //    summary.AppendLine($"   • Each with unique slab thicknesses");
-        //    summary.AppendLine($"   • Concrete grades applied per schedule\n");
-
-        //    summary.AppendLine("🏗️ CONCRETE GRADE RANGES:");
-        //    foreach (var range in gradeSchedule.GetGradeRanges())
-        //    {
-        //        summary.AppendLine($"   F{range.StartFloor:D2}-F{range.EndFloor:D2}: " +
-        //            $"{range.WallGrade}/{range.BeamSlabGrade}");
-        //    }
-
-        //    summary.AppendLine("\n╚════════════════════════════════════════════════════╝");
-
-        //    // Log to debug output
-        //    Debug.WriteLine(summary.ToString());
-
-        //    // Note: Don't show MessageBox here - MainForm will show its own success message
-        //}
-
-        private void ShowImportSummary(List<FloorTypeConfig> configs, int totalStories, double totalHeight,int typicalfloors,
-            string seismicZone, GradeScheduleManager gradeSchedule)
+        private void ShowImportSummary(
+            List<FloorTypeConfig> configs, int totalStories, double totalHeight,
+            int typicalFloors, string seismicZone, GradeScheduleManager gradeSchedule,
+            double foundationHeight)
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"✅ Import OK | {totalStories} floors | {totalHeight:F2}m | Zone {seismicZone}");
-
+            sb.AppendLine("═══════════════════════════════════════");
+            sb.AppendLine("✅ IMPORT SUCCESSFUL");
+            sb.AppendLine("═══════════════════════════════════════");
+            sb.AppendLine($"Total Stories:    {totalStories}");
+            sb.AppendLine($"Building Height:  {totalHeight:F2}m");
+            if (foundationHeight > 0)
+                sb.AppendLine($"Foundation:       {foundationHeight:F2}m (walls only)");
+            sb.AppendLine($"Seismic Zone:     {seismicZone}");
+            if (typicalFloors > 0)
+                sb.AppendLine($"Typical Floors:   {typicalFloors}");
+            sb.AppendLine();
+            sb.AppendLine("FLOOR SUMMARY:");
             foreach (var c in configs)
-                sb.AppendLine($"  {c.Name}: {c.Count}×{c.Height:F2}m");
-
+            {
+                if (c.IsIndividualBasement)
+                    sb.AppendLine($"  Basement {c.BasementNumber}: 1 × {c.Height:F2}m");
+                else
+                    sb.AppendLine($"  {c.Name}: {c.Count} × {c.Height:F2}m");
+            }
+            sb.AppendLine("\nGRADE SCHEDULE:");
             foreach (var r in gradeSchedule.GetGradeRanges())
-                sb.AppendLine($"  F{r.StartFloor:D2}-F{r.EndFloor:D2}: {r.WallGrade}/{r.BeamSlabGrade}");
+                sb.AppendLine($"  F{r.StartFloor + 1:D2}-F{r.EndFloor + 1:D2}: {r.WallGrade} / {r.BeamSlabGrade}");
+            sb.AppendLine("═══════════════════════════════════════");
 
-            Debug.WriteLine(sb.ToString());
+            Debug.WriteLine("\n" + sb.ToString());
+            MessageBox.Show(sb.ToString(), "Import Complete",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 }
-
-// ============================================================================
-// END OF FILE
-// ============================================================================

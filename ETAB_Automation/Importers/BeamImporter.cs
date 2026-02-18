@@ -421,24 +421,7 @@ namespace ETABS_CAD_Automation.Importers
             return count;
         }
 
-        //private string GetStoryName(int story)
-        //{
-        //    try
-        //    {
-        //        int numStories = 0;
-        //        string[] storyNames = null;
-
-        //        int ret = sapModel.Story.GetNameList(ref numStories, ref storyNames);
-
-        //        if (ret == 0 && storyNames != null && story >= 0 && story < storyNames.Length)
-        //        {
-        //            return storyNames[story];
-        //        }
-        //    }
-        //    catch { }
-
-        //    return story == 0 ? "Base" : $"Story{story + 1}";
-        //}
+  
 
         private string GetStoryName(int story)
         {

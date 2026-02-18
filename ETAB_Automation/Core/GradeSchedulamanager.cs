@@ -3,8 +3,9 @@
 // FILE: Core/GradeScheduleManager.cs (UPDATED)
 // ============================================================================
 // PURPOSE: Manages concrete grade assignments by floor level
+//          Supports individual basement floors and all floor types
 // AUTHOR: ETAB Automation Team
-// VERSION: 2.1 (Added GetWallGrade and GetBeamSlabGrade methods)
+// VERSION: 2.2 (Individual Basement Floor Support)
 // ============================================================================
 
 using System;
@@ -16,6 +17,14 @@ namespace ETAB_Automation.Core
     /// <summary>
     /// Manages concrete grade scheduling for walls, beams, and slabs
     /// Wall grades are user-defined, beam/slab grades auto-calculated as 0.7× wall grade
+    /// 
+    /// Supports all floor types:
+    /// - Individual basement floors (Basement1-5)
+    /// - Podium floors
+    /// - Ground floor
+    /// - E-Deck floor
+    /// - Typical floors
+    /// - Terrace floor
     /// </summary>
     public class GradeScheduleManager
     {
@@ -40,6 +49,10 @@ namespace ETAB_Automation.Core
 
         /// <summary>
         /// Represents a floor range with assigned grades
+        /// Floor indices are 0-based:
+        ///   Index 0 = First basement (Basement1) or first floor if no basements
+        ///   Index 1 = Second basement (Basement2) or second floor
+        ///   etc.
         /// </summary>
         public class GradeRange
         {
@@ -57,6 +70,7 @@ namespace ETAB_Automation.Core
 
             /// <summary>
             /// Get a human-readable description of this range
+            /// Display uses 1-based floor numbers for user clarity
             /// </summary>
             public override string ToString()
             {
@@ -77,9 +91,15 @@ namespace ETAB_Automation.Core
 
         /// <summary>
         /// Initialize grade schedule manager with wall grades and floor counts
+        /// Grades are assigned from bottom to top of building
+        /// 
+        /// Example for 5-basement + 10-typical building:
+        ///   wallGrades = ["M50", "M45", "M40"]
+        ///   floorsPerGrade = [5, 5, 5]
+        ///   Result: Basements 1-5 = M50, Typical 1-5 = M45, Typical 6-10 = M40
         /// </summary>
         /// <param name="wallGrades">List of wall concrete grades (e.g., ["M50", "M45", "M40"])</param>
-        /// <param name="floorsPerGrade">Number of floors for each grade segment (e.g., [11, 10, 10])</param>
+        /// <param name="floorsPerGrade">Number of floors for each grade segment (e.g., [5, 5, 5])</param>
         public GradeScheduleManager(List<string> wallGrades, List<int> floorsPerGrade)
         {
             if (wallGrades == null || floorsPerGrade == null)
@@ -122,6 +142,11 @@ namespace ETAB_Automation.Core
         /// <summary>
         /// Calculate beam/slab grade from wall grade using 0.7× formula
         /// Result is rounded up to nearest 5, with minimum of M30
+        /// 
+        /// Examples:
+        ///   M50 → 50 × 0.7 = 35 → M35
+        ///   M45 → 45 × 0.7 = 31.5 → round to 35 → M35
+        ///   M40 → 40 × 0.7 = 28 → round to 30 → M30 (minimum)
         /// </summary>
         /// <param name="wallGrade">Wall grade (e.g., "M50")</param>
         /// <returns>Calculated beam/slab grade (e.g., "M35")</returns>
@@ -163,6 +188,12 @@ namespace ETAB_Automation.Core
         /// <summary>
         /// Get wall grade for a specific story (0-based index)
         /// This is the method called by CADImporterEnhanced
+        /// 
+        /// Story index mapping:
+        ///   0 = First basement (Basement1) OR first floor if no basements
+        ///   1 = Second basement (Basement2) OR second floor
+        ///   2 = Third basement (Basement3) OR third floor
+        ///   etc.
         /// </summary>
         /// <param name="storyIndex">Story index (0-based)</param>
         /// <returns>Wall concrete grade (e.g., "M50")</returns>
@@ -244,6 +275,7 @@ namespace ETAB_Automation.Core
 
         /// <summary>
         /// Get floor range text for a schedule index (for display purposes)
+        /// Uses 1-based floor numbers for user clarity
         /// </summary>
         /// <param name="scheduleIndex">Index in gradeSchedules list</param>
         /// <returns>Floor range text (e.g., "1-11")</returns>
@@ -309,7 +341,7 @@ namespace ETAB_Automation.Core
 
         /// <summary>
         /// Get grade ranges with floor numbers (useful for display/reporting)
-        /// Returns 0-based floor indices
+        /// Returns 0-based floor indices internally, but ToString() shows 1-based
         /// </summary>
         /// <returns>List of grade ranges</returns>
         public List<GradeRange> GetGradeRanges()
@@ -338,6 +370,7 @@ namespace ETAB_Automation.Core
 
         /// <summary>
         /// Print detailed grade schedule to debug output
+        /// Shows how grades map to individual basement floors and other floors
         /// </summary>
         public void PrintDetailedSchedule()
         {
@@ -345,7 +378,8 @@ namespace ETAB_Automation.Core
             System.Diagnostics.Debug.WriteLine("║         CONCRETE GRADE SCHEDULE DETAIL             ║");
             System.Diagnostics.Debug.WriteLine("╚════════════════════════════════════════════════════╝\n");
 
-            System.Diagnostics.Debug.WriteLine($"Total Floors: {totalFloors}\n");
+            System.Diagnostics.Debug.WriteLine($"Total Floors: {totalFloors}");
+            System.Diagnostics.Debug.WriteLine("(Includes individual basements, ground, podium, etc.)\n");
 
             var ranges = GetGradeRanges();
             foreach (var range in ranges)
@@ -376,6 +410,7 @@ namespace ETAB_Automation.Core
 
         /// <summary>
         /// Get total number of floors covered by this schedule
+        /// Includes all floor types: basements, podium, ground, e-deck, typical, terrace
         /// </summary>
         public int TotalFloors => totalFloors;
 
