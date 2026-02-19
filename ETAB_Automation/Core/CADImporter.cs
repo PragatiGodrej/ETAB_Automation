@@ -1,6 +1,6 @@
 ﻿
 // ============================================================================
-// FILE: Importers/CADImporterEnhanced.cs — VERSION 3.2 (CORRECTED INNER LOOP)
+// FILE: Core/CADImporterEnhanced.cs — VERSION 3.3
 // ============================================================================
 
 // ============================================================================
@@ -26,7 +26,7 @@ namespace ETAB_Automation.Core
 
         public CADImporterEnhanced(cSapModel model)
         {
-            sapModel = model;
+            sapModel     = model;
             storyManager = new StoryManager(model);
         }
 
@@ -42,14 +42,14 @@ namespace ETAB_Automation.Core
             try
             {
                 Debug.WriteLine("\n╔════════════════════════════════════════════════════╗");
-                Debug.WriteLine("║  CAD IMPORTER v3.2 FIXED — CORRECT ELEVATIONS     ║");
+                Debug.WriteLine("║  CAD IMPORTER v3.3 — TERRACE + SETSTORIES FIXED   ║");
                 Debug.WriteLine("╚════════════════════════════════════════════════════╝\n");
 
                 sapModel.SetModelIsLocked(false);
                 sapModel.SetPresentUnits(eUnits.N_m_C);
 
                 var gradeSchedule = new GradeScheduleManager(wallGrades, floorsPerGrade);
-                int totalStories = storyHeights.Count;
+                int totalStories  = storyHeights.Count;
 
                 if (!gradeSchedule.ValidateTotalFloors(totalStories))
                 {
@@ -65,10 +65,8 @@ namespace ETAB_Automation.Core
                 ShowDesignNotes(floorConfigs, totalTypicalFloors, seismicZone,
                                 gradeSchedule, foundationHeight);
 
-                // Pass foundationHeight so all story base elevations are offset
-                // above the foundation. Foundation walls (0 → foundationHeight)
-                // are imported separately below and do NOT occupy a story slot.
                 Debug.WriteLine("\n📐 Creating building stories...");
+                // StoryManager v2.5: similar[]=null fix + duplicate name guard + diagnostic dump
                 storyManager.DefineStoriesWithCustomNames(storyHeights, storyNames, foundationHeight);
 
                 WallThicknessCalculator.LoadAvailableWallSections(sapModel);
@@ -79,7 +77,7 @@ namespace ETAB_Automation.Core
                 if (foundationHeight > 0)
                 {
                     Debug.WriteLine($"\n╔═══════════════════════════════════════╗");
-                    Debug.WriteLine($"║  FOUNDATION WALLS: {foundationHeight:F2}m".PadRight(41) + "║");
+                    Debug.WriteLine(($"║  FOUNDATION WALLS: {foundationHeight:F2}m").PadRight(41) + "║");
                     Debug.WriteLine($"╚═══════════════════════════════════════╝");
 
                     var firstBasement = floorConfigs.FirstOrDefault(
@@ -98,8 +96,7 @@ namespace ETAB_Automation.Core
                         if (foundationDxf == null)
                         {
                             MessageBox.Show(
-                                $"❌ Failed to load CAD file for foundation walls\n\n" +
-                                $"File: {firstBasement.CADFilePath}",
+                                $"❌ Failed to load CAD file for foundation walls\n\nFile: {firstBasement.CADFilePath}",
                                 "CAD Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             return false;
                         }
@@ -107,14 +104,14 @@ namespace ETAB_Automation.Core
                         var foundationWallImporter = new WallImporterEnhanced(
                             sapModel,
                             foundationDxf,
-                            foundationHeight,   // ← correct: foundation's own height
+                            foundationHeight,
                             totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
                             seismicZone,
                             gradeSchedule);
 
                         foundationWallImporter.ImportWalls(
                             firstBasement.LayerMapping,
-                            0.0,   // base of building
+                            0.0,   // base of building (below foundation)
                             0);    // story index 0 for grade lookup
 
                         Debug.WriteLine("   ✓ Foundation walls created");
@@ -125,14 +122,6 @@ namespace ETAB_Automation.Core
                 // ============================================================
                 // IMPORT EACH FLOOR TYPE
                 // ============================================================
-                // Foundation walls do NOT consume a story slot.
-                // StoryManager already offsets ALL story base elevations upward
-                // by foundationHeight (cumulativeHeight starts at foundationHeight).
-                //
-                // Result:
-                //   Foundation walls : 0.0             → foundationHeight  (walls only)
-                //   Basement1 walls  : foundationHeight → foundationHeight + B1height
-                //   NO GAP, NO SKIP — always start at index 0.
                 int currentStoryIndex = 0;
 
                 foreach (var floorConfig in floorConfigs)
@@ -145,19 +134,18 @@ namespace ETAB_Automation.Core
                     if (dxfDoc == null)
                     {
                         MessageBox.Show(
-                            $"❌ Failed to load CAD file for {floorConfig.Name}\n\n" +
-                            $"File: {floorConfig.CADFilePath}",
+                            $"❌ Failed to load CAD file for {floorConfig.Name}\n\nFile: {floorConfig.CADFilePath}",
                             "CAD Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return false;
                     }
 
                     Debug.WriteLine($"✓ Loaded: {System.IO.Path.GetFileName(floorConfig.CADFilePath)}");
 
-                    // Beam and slab importers are floor-type-scoped (no per-floor state)
                     var beamImporter = new BeamImporterEnhanced(
                         sapModel, dxfDoc, seismicZone,
                         totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
-                        floorConfig.BeamDepths, gradeSchedule);
+                        floorConfig.BeamDepths, gradeSchedule,
+                        floorConfig.BeamWidthOverrides);
 
                     var slabImporter = new SlabImporterEnhanced(
                         sapModel, dxfDoc,
@@ -177,59 +165,62 @@ namespace ETAB_Automation.Core
                             return false;
                         }
 
-                        double baseElevation = storyManager.GetStoryBaseElevation(currentStoryIndex);
-                        double topElevation = storyManager.GetStoryTopElevation(currentStoryIndex);
+                        double baseElevation  = storyManager.GetStoryBaseElevation(currentStoryIndex);
+                        double topElevation   = storyManager.GetStoryTopElevation(currentStoryIndex);
                         double thisFloorHeight = topElevation - baseElevation;
 
-                        string wallGrade = gradeSchedule.GetWallGrade(currentStoryIndex);
+                        string wallGrade     = gradeSchedule.GetWallGrade(currentStoryIndex);
                         string beamSlabGrade = gradeSchedule.GetBeamSlabGrade(currentStoryIndex);
+
+                        // --------------------------------------------------------
+                        // FIX: Terrace elements must be placed at the ETABS-actual
+                        // elevation (120.001m), not the computed top (120.000m).
+                        // ETABS assigns Terrace top = base + 0.001m nominal height,
+                        // so elements placed at 120.000m end up in Story34's plan,
+                        // not the Terrace plan view.
+                        // For all other stories, use baseElevation (slab-at-base convention).
+                        // --------------------------------------------------------
+                        bool isTerraceStory = storyNames[currentStoryIndex]
+                            .Equals("Terrace", StringComparison.OrdinalIgnoreCase);
+
+                        double placementElevation = isTerraceStory
+                            ? storyManager.GetETABSStoryElevation(storyNames[currentStoryIndex])
+                            : baseElevation;
 
                         Debug.WriteLine($"\n   [{floor + 1}/{floorConfig.Count}] " +
                                         $"{storyNames[currentStoryIndex]} (idx {currentStoryIndex})");
-                        Debug.WriteLine($"       Grade : Wall={wallGrade}, Beam/Slab={beamSlabGrade}");
-                        Debug.WriteLine($"       Base  : {baseElevation:F3}m");
-                        Debug.WriteLine($"       Top   : {topElevation:F3}m");
-                        Debug.WriteLine($"       Height: {thisFloorHeight:F3}m");
+                        Debug.WriteLine($"       Grade      : Wall={wallGrade}, Beam/Slab={beamSlabGrade}");
+                        Debug.WriteLine($"       Base       : {baseElevation:F3}m");
+                        Debug.WriteLine($"       Top        : {topElevation:F3}m");
+                        Debug.WriteLine($"       Height     : {thisFloorHeight:F3}m");
+                        Debug.WriteLine($"       IsTerrace  : {isTerraceStory}");
                         Debug.WriteLine($"\n       Placement:");
-                        Debug.WriteLine($"         Walls  → base={baseElevation:F3}m, " +
-                                        $"height={thisFloorHeight:F3}m (rises to {topElevation:F3}m)");
-                        Debug.WriteLine($"         Beams  → elevation={topElevation:F3}m  ← TOP of story");
-                        Debug.WriteLine($"         Slabs  → elevation={topElevation:F3}m  ← TOP of story");
+                        Debug.WriteLine($"         Walls  → base={placementElevation:F3}m, " +
+                                        $"height={thisFloorHeight:F3}m");
+                        Debug.WriteLine($"         Beams  → {placementElevation:F3}m");
+                        Debug.WriteLine($"         Slabs  → {placementElevation:F3}m");
 
-                        // --------------------------------------------------------
-                        // WallImporter is per-floor so thisFloorHeight is always
-                        // correct for this specific floor (BUG-6 from v3.1).
-                        // --------------------------------------------------------
+                        // Wall importer is per-floor (thisFloorHeight changes each story)
                         var wallImporter = new WallImporterEnhanced(
                             sapModel, dxfDoc,
-                            thisFloorHeight,    // ← height of THIS floor only
+                            thisFloorHeight,
                             totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
                             seismicZone,
                             gradeSchedule);
 
-                        // Walls start at the BASE of the story
                         wallImporter.ImportWalls(
                             floorConfig.LayerMapping,
-                            baseElevation,       // ← bottom of wall
+                            placementElevation,
                             currentStoryIndex);
-
-                        // --------------------------------------------------------
-                        // BEAMS and SLABS are always placed at baseElevation.
-                        // The CAD floor plan represents the slab level at the
-                        // BASE of each story for all floor types.
-                        // Walls start at baseElevation and rise thisFloorHeight.
-                        // --------------------------------------------------------
-                        Debug.WriteLine($"         Beams  → {baseElevation:F3}m  (base of story)");
-                        Debug.WriteLine($"         Slabs  → {baseElevation:F3}m  (base of story)");
 
                         beamImporter.ImportBeams(
                             floorConfig.LayerMapping,
-                            baseElevation,       // ← base of this story
+                            placementElevation,
                             currentStoryIndex);
 
                         slabImporter.ImportSlabs(
                             floorConfig.LayerMapping,
-                            baseElevation,       // ← base of this story
+                            placementElevation,
                             currentStoryIndex);
 
                         currentStoryIndex++;
@@ -325,7 +316,6 @@ namespace ETAB_Automation.Core
             int periThick = WallThicknessCalculator.GetRecommendedThickness(
                 refFloors, WallThicknessCalculator.WallType.PeripheralDeadWall, seismicZone, 2.0, false);
             msg.AppendLine($"\nRECOMMENDED WALLS: Core ~{coreThick}mm | Peripheral ~{periThick}mm");
-
             msg.AppendLine("\n═══════════════════════════════════════");
 
             if (MessageBox.Show(msg.ToString() + "\n\nProceed with import?",

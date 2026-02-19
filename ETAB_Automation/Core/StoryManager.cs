@@ -1,4 +1,5 @@
-﻿// ============================================================================
+﻿
+// ============================================================================
 // FILE: Core/StoryManager.cs — VERSION 2.4
 // ============================================================================
 // FIX: Accept foundationHeight as baseElev offset.
@@ -65,9 +66,10 @@ namespace ETAB_Automation.Core
                         $"Story '{storyNames[i]}' (index {i}) has height {storyHeights[i]:F3}m. " +
                         $"All story heights must be > 0 (Terrace is the only exception — it is always 0).");
             }
+        
 
             sapModel.SetModelIsLocked(false);
-
+            
             System.Diagnostics.Debug.WriteLine("\n========== UNIT SYSTEM CHECK ==========");
             System.Diagnostics.Debug.WriteLine("Setting units to: N_m_C");
             sapModel.SetPresentUnits(eUnits.N_m_C);
@@ -294,5 +296,14 @@ namespace ETAB_Automation.Core
                 elevation += storyHeights[i];
             return elevation;
         }
+        public double GetETABSStoryElevation(string storyName)
+        {
+            double storedElev = 0;
+            if (sapModel.Story.GetElevation(storyName, ref storedElev) == 0)
+                return storedElev;
+            throw new Exception($"Could not retrieve ETABS elevation for story '{storyName}'");
+        }
+       
+        
     }
 }

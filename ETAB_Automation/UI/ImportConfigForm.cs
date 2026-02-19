@@ -1,682 +1,9 @@
-﻿//// ============================================================================
-//// FILE: UI/ImportConfigForm.cs (PART 1 - Main Form)
-//// ============================================================================
-//// PURPOSE: Main configuration form class with core logic
-//// AUTHOR: ETAB Automation Team
-//// VERSION: 2.1 (Split into 2 parts)
-//// ============================================================================
-
-//using ETAB_Automation.Importers;
-//using ETAB_Automation.Models;
-//using System;
-//using System.Collections.Generic;
-//using System.Linq;
-//using System.Windows.Forms;
-
-//namespace ETAB_Automation
-//{
-//    /// <summary>
-//    /// Main configuration form for importing CAD files
-//    /// Part 1: Core logic, validation, and event handlers
-//    /// Part 2: UI initialization (ImportConfigFormUI.cs)
-//    /// </summary>
-//    public partial class ImportConfigForm : Form
-//    {
-//        // ====================================================================
-//        // PUBLIC PROPERTIES
-//        // ====================================================================
-
-//        public List<FloorTypeConfig> FloorConfigs { get; private set; }
-//        public string SeismicZone { get; private set; }
-//        public List<string> WallGrades { get; private set; }
-//        public List<int> FloorsPerGrade { get; private set; }
-
-//        // ====================================================================
-//        // UI CONTROLS (declared here, initialized in Part 2)
-//        // ====================================================================
-
-//        internal TabControl tabControl;
-//        internal Button btnImport;
-//        internal Button btnCancel;
-
-//        // Building config
-//        internal CheckBox chkBasement;
-//        internal CheckBox chkPodium;
-//        internal CheckBox chkEDeck; // Always enabled, but can be toggled for import
-//        internal CheckBox chkTypical; // Always enabled, but can be toggled for import
-
-//        internal CheckBox chkTerrace;
-//        internal CheckBox chkFoundation;
-//        internal NumericUpDown numBasementLevels;
-//        internal NumericUpDown numPodiumLevels;
-//        internal NumericUpDown numTypicalLevels;
-//        internal NumericUpDown numBasementHeight;
-//        internal NumericUpDown numPodiumHeight;
-//        internal NumericUpDown numEDeckHeight;
-//        internal NumericUpDown numTypicalHeight;
-//        internal NumericUpDown numTerraceheight;
-//        internal NumericUpDown numFoundationHeight;
-//        internal ComboBox cmbSeismicZone;
-
-//        // Grade schedule
-//        internal DataGridView dgvGradeSchedule;
-//        internal NumericUpDown numTotalFloors;
-//        internal Button btnAddGradeRow;
-//        internal Button btnRemoveGradeRow;
-//        internal Label lblGradeTotal;
-
-//        // CAD Import (dynamic per floor type)
-//        internal Dictionary<string, TextBox> cadPathTextBoxes;
-//        internal Dictionary<string, ListBox> availableLayerListBoxes;
-//        internal Dictionary<string, ListBox> mappedLayerListBoxes;
-//        internal Dictionary<string, ComboBox> elementTypeComboBoxes;
-
-//        // Per-floor beam depths
-//        internal Dictionary<string, NumericUpDown> numInternalGravityDepthPerFloor;
-//        internal Dictionary<string, NumericUpDown> numCantileverGravityDepthPerFloor;
-//        internal Dictionary<string, NumericUpDown> numCoreMainDepthPerFloor;
-//        internal Dictionary<string, NumericUpDown> numPeripheralDeadMainDepthPerFloor;
-//        internal Dictionary<string, NumericUpDown> numPeripheralPortalMainDepthPerFloor;
-//        internal Dictionary<string, NumericUpDown> numInternalMainDepthPerFloor;
-
-//        // Per-floor slab thicknesses
-//        internal Dictionary<string, NumericUpDown> numLobbySlabThicknessPerFloor;
-//        internal Dictionary<string, NumericUpDown> numStairSlabThicknessPerFloor;
-
-//        // ====================================================================
-//        // CONSTRUCTOR
-//        // ====================================================================
-
-//        public ImportConfigForm()
-//        {
-//            InitializeComponent();
-
-//            // Initialize data collections
-//            FloorConfigs = new List<FloorTypeConfig>();
-//            WallGrades = new List<string>();
-//            FloorsPerGrade = new List<int>();
-
-//            // Initialize control dictionaries
-//            cadPathTextBoxes = new Dictionary<string, TextBox>();
-//            availableLayerListBoxes = new Dictionary<string, ListBox>();
-//            mappedLayerListBoxes = new Dictionary<string, ListBox>();
-//            elementTypeComboBoxes = new Dictionary<string, ComboBox>();
-//            numInternalGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
-//            numCantileverGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
-//            numCoreMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
-//            numPeripheralDeadMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
-//            numPeripheralPortalMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
-//            numInternalMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
-//            numLobbySlabThicknessPerFloor = new Dictionary<string, NumericUpDown>();
-//            numStairSlabThicknessPerFloor = new Dictionary<string, NumericUpDown>();
-
-//            // Build UI (calls Part 2)
-//            InitializeControlsUI();
-//        }
-
-//        // ====================================================================
-//        // CAD FILE LOADING
-//        // ====================================================================
-
-//        internal void BtnLoadCAD_Click(string floorType)
-//        {
-//            OpenFileDialog ofd = new OpenFileDialog
-//            {
-//                Filter = "AutoCAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|All Files (*.*)|*.*",
-//                Title = $"Select CAD File for {floorType}"
-//            };
-
-//            if (ofd.ShowDialog() != DialogResult.OK) return;
-
-//            cadPathTextBoxes[floorType].Text = ofd.FileName;
-//            string extension = System.IO.Path.GetExtension(ofd.FileName).ToLower();
-
-//            if (extension == ".dwg")
-//            {
-//                MessageBox.Show(
-//                    "DWG files are not directly supported.\n\n" +
-//                    "Please convert to DXF format:\n" +
-//                    "1. Open in AutoCAD\n" +
-//                    "2. Save As → DXF\n" +
-//                    "3. Load the DXF file here",
-//                    "DWG Not Supported",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Warning);
-//                return;
-//            }
-
-//            if (extension != ".dxf")
-//            {
-//                MessageBox.Show(
-//                    "Please select a DXF file.\n\n" +
-//                    "Supported format: .dxf",
-//                    "Invalid File Type",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Warning);
-//                return;
-//            }
-
-//            try
-//            {
-//                CADLayerReader reader = new CADLayerReader();
-//                List<string> layers = reader.GetLayerNamesFromFile(ofd.FileName);
-
-//                if (layers.Count == 0)
-//                {
-//                    MessageBox.Show(
-//                        "No layers found in CAD file.",
-//                        "No Layers Found",
-//                        MessageBoxButtons.OK,
-//                        MessageBoxIcon.Warning);
-//                    return;
-//                }
-
-//                availableLayerListBoxes[floorType].Items.Clear();
-//                foreach (string layer in layers)
-//                {
-//                    availableLayerListBoxes[floorType].Items.Add(layer);
-//                }
-
-//                AutoMapLayers(floorType, layers);
-
-//                MessageBox.Show(
-//                    $"✓ CAD file loaded!\n\n" +
-//                    $"Layers: {layers.Count}\n\n" +
-//                    "Auto-mapped based on naming conventions.",
-//                    "Layers Loaded",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Information);
-//            }
-//            catch (Exception ex)
-//            {
-//                MessageBox.Show(
-//                    $"Error reading CAD file:\n\n{ex.Message}",
-//                    "CAD Read Error",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Error);
-//            }
-//        }
-
-//        private void AutoMapLayers(string floorType, List<string> layers)
-//        {
-//            mappedLayerListBoxes[floorType].Items.Clear();
-
-//            foreach (string layer in layers)
-//            {
-//                string elementType = null;
-
-//                if (layer.StartsWith("B-") || layer.Contains("Beam") ||
-//                    layer.Contains("BEAM") || layer.Contains("beam"))
-//                    elementType = "Beam";
-//                else if (layer.Contains("wall") || layer.Contains("Wall") ||
-//                         layer.Contains("WALL"))
-//                    elementType = "Wall";
-//                else if (layer.StartsWith("S-") || layer.Contains("Slab") ||
-//                         layer.Contains("SLAB"))
-//                    elementType = "Slab";
-
-//                if (elementType != null)
-//                {
-//                    mappedLayerListBoxes[floorType].Items.Add($"{layer} → {elementType}");
-//                }
-//            }
-//        }
-
-//        internal void BtnAddMapping_Click(string floorType)
-//        {
-//            if (availableLayerListBoxes[floorType].SelectedItem == null)
-//            {
-//                MessageBox.Show("Please select a layer to map.", "Info");
-//                return;
-//            }
-
-//            string layerName = availableLayerListBoxes[floorType].SelectedItem.ToString();
-//            string elementType = elementTypeComboBoxes[floorType].SelectedItem.ToString();
-
-//            if (elementType == "Ignore") return;
-
-//            string mapping = $"{layerName} → {elementType}";
-//            if (!mappedLayerListBoxes[floorType].Items.Contains(mapping))
-//            {
-//                mappedLayerListBoxes[floorType].Items.Add(mapping);
-//            }
-//            else
-//            {
-//                MessageBox.Show("Layer already mapped.", "Info");
-//            }
-//        }
-
-//        internal void BtnRemoveMapping_Click(string floorType)
-//        {
-//            if (mappedLayerListBoxes[floorType].SelectedItem == null)
-//            {
-//                MessageBox.Show("Please select a mapping to remove.", "Info");
-//                return;
-//            }
-
-//            mappedLayerListBoxes[floorType].Items.Remove(
-//                mappedLayerListBoxes[floorType].SelectedItem);
-//        }
-
-//        // ====================================================================
-//        // GRADE SCHEDULE HANDLERS
-//        // ====================================================================
-
-//        private void BtnAddGradeRow_Click(object sender, EventArgs e)
-//        {
-//            int rowIndex = dgvGradeSchedule.Rows.Add();
-//            var row = dgvGradeSchedule.Rows[rowIndex];
-
-//            row.Cells["Index"].Value = rowIndex;
-//            row.Cells["WallGrade"].Value = "M40";
-//            row.Cells["FloorsCount"].Value = "1";
-//            row.Cells["BeamSlabGrade"].Value = "M30";
-//            row.Cells["FloorRange"].Value = "";
-
-//            UpdateGradeTotals();
-//        }
-
-//        private void BtnRemoveGradeRow_Click(object sender, EventArgs e)
-//        {
-//            if (dgvGradeSchedule.SelectedRows.Count > 0)
-//            {
-//                dgvGradeSchedule.Rows.RemoveAt(dgvGradeSchedule.SelectedRows[0].Index);
-//                ReindexRows();
-//                UpdateGradeTotals();
-//            }
-//        }
-
-//        private void DgvGradeSchedule_CellValueChanged(object sender, DataGridViewCellEventArgs e)
-//        {
-//            if (e.RowIndex < 0) return;
-
-//            var row = dgvGradeSchedule.Rows[e.RowIndex];
-
-//            if (e.ColumnIndex == dgvGradeSchedule.Columns["WallGrade"].Index)
-//            {
-//                string wallGrade = row.Cells["WallGrade"].Value?.ToString();
-//                if (!string.IsNullOrEmpty(wallGrade))
-//                {
-//                    row.Cells["BeamSlabGrade"].Value = CalculateBeamSlabGrade(wallGrade);
-//                }
-//            }
-
-//            if (e.ColumnIndex == dgvGradeSchedule.Columns["FloorsCount"].Index)
-//            {
-//                UpdateGradeTotals();
-//            }
-//        }
-
-//        private string CalculateBeamSlabGrade(string wallGrade)
-//        {
-//            try
-//            {
-//                int wallValue = int.Parse(wallGrade.Replace("M", "").Replace("m", "").Trim());
-//                int beamSlabValue = (int)(Math.Ceiling((wallValue * 0.7) / 5.0) * 5);
-//                if (beamSlabValue < 30) beamSlabValue = 30;
-//                return $"M{beamSlabValue}";
-//            }
-//            catch
-//            {
-//                return "M30";
-//            }
-//        }
-
-//        private void ReindexRows()
-//        {
-//            for (int i = 0; i < dgvGradeSchedule.Rows.Count; i++)
-//            {
-//                dgvGradeSchedule.Rows[i].Cells["Index"].Value = i;
-//            }
-//            UpdateFloorRanges();
-//        }
-
-//        private void UpdateFloorRanges()
-//        {
-//            int currentFloor = 1;
-
-//            for (int i = 0; i < dgvGradeSchedule.Rows.Count; i++)
-//            {
-//                var row = dgvGradeSchedule.Rows[i];
-//                string floorsStr = row.Cells["FloorsCount"].Value?.ToString();
-
-//                if (int.TryParse(floorsStr, out int floorCount) && floorCount > 0)
-//                {
-//                    int endFloor = currentFloor + floorCount - 1;
-//                    row.Cells["FloorRange"].Value = $"{currentFloor}-{endFloor}";
-//                    currentFloor = endFloor + 1;
-//                }
-//                else
-//                {
-//                    row.Cells["FloorRange"].Value = "";
-//                }
-//            }
-//        }
-
-//        internal void UpdateGradeTotals()
-//        {
-//            int totalInSchedule = 0;
-
-//            foreach (DataGridViewRow row in dgvGradeSchedule.Rows)
-//            {
-//                string floorsStr = row.Cells["FloorsCount"].Value?.ToString();
-//                if (int.TryParse(floorsStr, out int floors))
-//                {
-//                    totalInSchedule += floors;
-//                }
-//            }
-
-//            int requiredTotal = (int)numTotalFloors.Value;
-//            bool isValid = totalInSchedule == requiredTotal;
-
-//            lblGradeTotal.Text = $"Total floors in schedule: {totalInSchedule} / {requiredTotal}";
-//            lblGradeTotal.ForeColor = isValid ?
-//                System.Drawing.Color.DarkGreen : System.Drawing.Color.DarkRed;
-
-//            if (isValid)
-//                lblGradeTotal.Text += " ✓ VALID";
-//            else if (totalInSchedule > requiredTotal)
-//                lblGradeTotal.Text += " ❌ TOO MANY";
-//            else
-//                lblGradeTotal.Text += " ❌ TOO FEW";
-
-//            UpdateFloorRanges();
-//        }
-
-//        internal void UpdateTotalFloorsForGradeSchedule()
-//        {
-//            int total = 0;
-
-//            if (chkBasement.Checked)
-//                total += (int)numBasementLevels.Value;
-//            if (chkPodium.Checked)
-//                total += (int)numPodiumLevels.Value;
-
-//            total += 1; // E-Deck
-//            total += (int)numTypicalLevels.Value;
-
-//            if (chkTerrace.Checked)
-//                total += 1;
-
-//            numTotalFloors.Value = total;
-//            UpdateGradeTotals();
-//        }
-
-//        // ====================================================================
-//        // BUILDING CONFIG HANDLERS
-//        // ====================================================================
-
-//        private void ChkBasement_CheckedChanged(object sender, EventArgs e)
-//        {
-//            numBasementLevels.Enabled = chkBasement.Checked;
-//            numBasementHeight.Enabled = chkBasement.Checked;
-//        }
-
-//        private void ChkTerrace_CheckedChanged(object sender, EventArgs e)
-//        {
-//            numTerraceheight.Enabled = chkTerrace.Checked;
-//        }
-
-//        private void ChkPodium_CheckedChanged(object sender, EventArgs e)
-//        {
-//            numPodiumLevels.Enabled = chkPodium.Checked;
-//            numPodiumHeight.Enabled = chkPodium.Checked;
-//        }
-
-//        // ====================================================================
-//        // IMPORT VALIDATION AND EXECUTION
-//        // ====================================================================
-
-//        private void BtnImport_Click(object sender, EventArgs e)
-//        {
-//            try
-//            {
-//                // Validate grade schedule
-//                if (!ValidateGradeSchedule())
-//                    return;
-
-//                // Collect floor configs
-//                if (!CollectFloorConfigs())
-//                    return;
-
-//                SeismicZone = cmbSeismicZone.SelectedItem?.ToString() ?? "Zone IV";
-
-//                ShowConfirmation();
-//            }
-//            catch (Exception ex)
-//            {
-//                MessageBox.Show(
-//                    $"Error preparing import:\n\n{ex.Message}",
-//                    "Import Error",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Error);
-//            }
-//        }
-
-//        private bool ValidateGradeSchedule()
-//        {
-//            if (dgvGradeSchedule.Rows.Count == 0)
-//            {
-//                MessageBox.Show(
-//                    "No concrete grades defined!\n\n" +
-//                    "Please add at least one grade row.",
-//                    "Grade Schedule Empty",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Error);
-//                tabControl.SelectedIndex = 1;
-//                return false;
-//            }
-
-//            WallGrades.Clear();
-//            FloorsPerGrade.Clear();
-
-//            int totalInSchedule = 0;
-//            foreach (DataGridViewRow row in dgvGradeSchedule.Rows)
-//            {
-//                string wallGrade = row.Cells["WallGrade"].Value?.ToString();
-//                string floorsStr = row.Cells["FloorsCount"].Value?.ToString();
-
-//                if (string.IsNullOrEmpty(wallGrade) || !int.TryParse(floorsStr, out int floors))
-//                {
-//                    MessageBox.Show(
-//                        $"Invalid grade schedule at row {row.Index}.",
-//                        "Validation Error",
-//                        MessageBoxButtons.OK,
-//                        MessageBoxIcon.Error);
-//                    tabControl.SelectedIndex = 1;
-//                    return false;
-//                }
-
-//                WallGrades.Add(wallGrade);
-//                FloorsPerGrade.Add(floors);
-//                totalInSchedule += floors;
-//            }
-
-//            int requiredFloors = (int)numTotalFloors.Value;
-//            if (totalInSchedule != requiredFloors)
-//            {
-//                MessageBox.Show(
-//                    $"Grade schedule mismatch!\n\n" +
-//                    $"Building: {requiredFloors} floors\n" +
-//                    $"Schedule: {totalInSchedule} floors",
-//                    "Validation Error",
-//                    MessageBoxButtons.OK,
-//                    MessageBoxIcon.Error);
-//                tabControl.SelectedIndex = 1;
-//                return false;
-//            }
-
-//            return true;
-//        }
-
-//        private bool CollectFloorConfigs()
-//        {
-//            FloorConfigs.Clear();
-
-//            if (chkBasement.Checked)
-//            {
-//                if (!AddFloorConfig("Basement", (int)numBasementLevels.Value,
-//                    (double)numBasementHeight.Value))
-//                    return false;
-//            }
-
-//            if (chkPodium.Checked)
-//            {
-//                if (!AddFloorConfig("Podium", (int)numPodiumLevels.Value,
-//                    (double)numPodiumHeight.Value))
-//                    return false;
-//            }
-
-//            if (!AddFloorConfig("EDeck", 1, (double)numEDeckHeight.Value))
-//                return false;
-
-//            if (!AddFloorConfig("Typical", (int)numTypicalLevels.Value,
-//                (double)numTypicalHeight.Value))
-//                return false;
-
-//            if (chkTerrace.Checked)
-//            {
-//                if (!AddFloorConfig("Terrace", 1, (double)numTerraceheight.Value))
-//                    return false;
-//            }
-
-//            return true;
-//        }
-
-//        private bool AddFloorConfig(string name, int count, double height)
-//        {
-//            if (!ValidateFloorConfig(name))
-//            {
-//                MessageBox.Show(
-//                    $"Please configure {name} CAD file and layer mappings.",
-//                    "Validation Error");
-//                return false;
-//            }
-
-//            FloorConfigs.Add(new FloorTypeConfig
-//            {
-//                Name = name,
-//                Count = count,
-//                Height = height,
-//                CADFilePath = cadPathTextBoxes[name].Text,
-//                LayerMapping = GetLayerMapping(name),
-//                BeamDepths = GetBeamDepthsForFloor(name),
-//                SlabThicknesses = GetSlabThicknessesForFloor(name)
-//            });
-
-//            return true;
-//        }
-
-//        private Dictionary<string, int> GetBeamDepthsForFloor(string floorType)
-//        {
-//            return new Dictionary<string, int>
-//            {
-//                ["InternalGravity"] = (int)numInternalGravityDepthPerFloor[floorType].Value,
-//                ["CantileverGravity"] = (int)numCantileverGravityDepthPerFloor[floorType].Value,
-//                ["CoreMain"] = (int)numCoreMainDepthPerFloor[floorType].Value,
-//                ["PeripheralDeadMain"] = (int)numPeripheralDeadMainDepthPerFloor[floorType].Value,
-//                ["PeripheralPortalMain"] = (int)numPeripheralPortalMainDepthPerFloor[floorType].Value,
-//                ["InternalMain"] = (int)numInternalMainDepthPerFloor[floorType].Value
-//            };
-//        }
-
-//        private Dictionary<string, int> GetSlabThicknessesForFloor(string floorType)
-//        {
-//            return new Dictionary<string, int>
-//            {
-//                ["Lobby"] = (int)numLobbySlabThicknessPerFloor[floorType].Value,
-//                ["Stair"] = (int)numStairSlabThicknessPerFloor[floorType].Value
-//            };
-//        }
-
-//        private bool ValidateFloorConfig(string floorType)
-//        {
-//            return cadPathTextBoxes.ContainsKey(floorType) &&
-//                   !string.IsNullOrEmpty(cadPathTextBoxes[floorType].Text) &&
-//                   mappedLayerListBoxes.ContainsKey(floorType) &&
-//                   mappedLayerListBoxes[floorType].Items.Count > 0;
-//        }
-
-//        private Dictionary<string, string> GetLayerMapping(string floorType)
-//        {
-//            Dictionary<string, string> mapping = new Dictionary<string, string>();
-
-//            if (mappedLayerListBoxes.ContainsKey(floorType))
-//            {
-//                foreach (var item in mappedLayerListBoxes[floorType].Items)
-//                {
-//                    string[] parts = item.ToString().Split(new[] { " → " },
-//                        StringSplitOptions.None);
-//                    if (parts.Length == 2)
-//                    {
-//                        mapping[parts[0]] = parts[1];
-//                    }
-//                }
-//            }
-
-//            return mapping;
-//        }
-
-//        private void ShowConfirmation()
-//        {
-//            int totalStories = FloorConfigs.Sum(c => c.Count);
-//            double totalHeight = FloorConfigs.Sum(c => c.Height * c.Count);
-
-//            var msg = new System.Text.StringBuilder();
-//            msg.AppendLine("CONFIRM IMPORT");
-//            msg.AppendLine("═══════════════════════════════════════\n");
-
-//            msg.AppendLine($"Building: {totalStories} floors, {totalHeight:F2}m, {SeismicZone}");
-//            msg.AppendLine($"Types: {string.Join(", ", FloorConfigs.Select(c => $"{c.Name}({c.Count})"))}\n");
-
-//            msg.AppendLine("FLOOR CONFIGS:");
-//            foreach (var config in FloorConfigs)
-//            {
-//                int gw = (SeismicZone == "Zone II" || SeismicZone == "Zone III") ? 200 : 240;
-//                msg.AppendLine($"\n{config.Name}:");
-//                msg.AppendLine($"  Beams: Grav {gw}x{config.BeamDepths["InternalGravity"]}, " +
-//                    $"Core {config.BeamDepths["CoreMain"]}");
-//                msg.AppendLine($"  Slabs: Lobby {config.SlabThicknesses["Lobby"]}mm, " +
-//                    $"Stair {config.SlabThicknesses["Stair"]}mm");
-//            }
-
-//            msg.AppendLine("\n\nGRADES:");
-//            int floorStart = 1;
-//            for (int i = 0; i < WallGrades.Count; i++)
-//            {
-//                string bsg = CalculateBeamSlabGrade(WallGrades[i]);
-//                int floorEnd = floorStart + FloorsPerGrade[i] - 1;
-//                msg.AppendLine($"  F{floorStart}-{floorEnd}: {WallGrades[i]}/{bsg}");
-//                floorStart = floorEnd + 1;
-//            }
-
-//            msg.AppendLine("\n═══════════════════════════════════════");
-//            msg.AppendLine("Ready to import?");
-
-//            var result = MessageBox.Show(
-//                msg.ToString(),
-//                "Confirm Import",
-//                MessageBoxButtons.YesNo,
-//                MessageBoxIcon.Question);
-
-//            if (result == DialogResult.Yes)
-//            {
-//                this.DialogResult = DialogResult.OK;
-//                this.Close();
-//            }
-//        }
-//    }
-//}
-
-//// ============================================================================
-//// END OF PART 1
-//// ============================================================================
+﻿
 // ============================================================================
 // FILE: UI/ImportConfigForm.cs (PART 1 - Main Form)
 // ============================================================================
 // PURPOSE: Main configuration form class with core logic
-// AUTHOR: ETAB Automation Team
-// VERSION: 2.2 (Updated for individual basement floors and ground floor)
+// VERSION: 2.4 — Named gravity beam depths per floor tab; overlap-free UI
 // ============================================================================
 
 using ETAB_Automation.Importers;
@@ -688,11 +15,6 @@ using System.Windows.Forms;
 
 namespace ETAB_Automation
 {
-    /// <summary>
-    /// Main configuration form for importing CAD files
-    /// Part 1: Core logic, validation, and event handlers
-    /// Part 2: UI initialization (ImportConfigFormUI.cs)
-    /// </summary>
     public partial class ImportConfigForm : Form
     {
         // ====================================================================
@@ -746,17 +68,48 @@ namespace ETAB_Automation
         internal Dictionary<string, ListBox> mappedLayerListBoxes;
         internal Dictionary<string, ComboBox> elementTypeComboBoxes;
 
-        // Per-floor beam depths
+        // ── Per-floor GRAVITY beam depths ────────────────────────────────
+        // Standard gravity types (present on every tab)
         internal Dictionary<string, NumericUpDown> numInternalGravityDepthPerFloor;
         internal Dictionary<string, NumericUpDown> numCantileverGravityDepthPerFloor;
+        // Named gravity variants — only shown when relevant floor type is included
+        internal Dictionary<string, NumericUpDown> numNoLoadGravityDepthPerFloor;
+        internal Dictionary<string, NumericUpDown> numEDeckGravityDepthPerFloor;
+        internal Dictionary<string, NumericUpDown> numPodiumGravityDepthPerFloor;
+        internal Dictionary<string, NumericUpDown> numGroundGravityDepthPerFloor;
+        internal Dictionary<string, NumericUpDown> numBasementGravityDepthPerFloor;
+
+        // ── Per-floor MAIN beam depths ───────────────────────────────────
         internal Dictionary<string, NumericUpDown> numCoreMainDepthPerFloor;
         internal Dictionary<string, NumericUpDown> numPeripheralDeadMainDepthPerFloor;
         internal Dictionary<string, NumericUpDown> numPeripheralPortalMainDepthPerFloor;
         internal Dictionary<string, NumericUpDown> numInternalMainDepthPerFloor;
 
-        // Per-floor slab thicknesses
+        // ── Per-floor beam WIDTH overrides (0 = auto) ────────────────────
+        internal Dictionary<string, NumericUpDown> numGravityWidthOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numCoreMainWidthOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numPeripheralDeadMainWidthOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numPeripheralPortalMainWidthOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numInternalMainWidthOverridePerFloor;
+
+        // ── Per-floor slab thicknesses — YELLOW layers ───────────────────
         internal Dictionary<string, NumericUpDown> numLobbySlabThicknessPerFloor;
         internal Dictionary<string, NumericUpDown> numStairSlabThicknessPerFloor;
+        internal Dictionary<string, NumericUpDown> numFireTenderSlabPerFloor;
+        internal Dictionary<string, NumericUpDown> numOHTSlabPerFloor;
+        internal Dictionary<string, NumericUpDown> numTerraceFireSlabPerFloor;
+        internal Dictionary<string, NumericUpDown> numUGTSlabPerFloor;
+        internal Dictionary<string, NumericUpDown> numLandscapeSlabPerFloor;
+        internal Dictionary<string, NumericUpDown> numSwimmingSlabPerFloor;
+        internal Dictionary<string, NumericUpDown> numDGSlabPerFloor;
+        internal Dictionary<string, NumericUpDown> numSTPSlabPerFloor;
+
+        // ── Per-floor wall thickness overrides ──────────────────────────
+        internal Dictionary<string, NumericUpDown> numCoreWallOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numPeriphDeadWallOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numPeriphPortalWallOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numInternalWallOverridePerFloor;
+        internal Dictionary<string, NumericUpDown> numNtaWallThicknessPerFloor;
 
         // ====================================================================
         // CONSTRUCTOR
@@ -766,26 +119,57 @@ namespace ETAB_Automation
         {
             InitializeComponent();
 
-            // Initialize data collections
             FloorConfigs = new List<FloorTypeConfig>();
             WallGrades = new List<string>();
             FloorsPerGrade = new List<int>();
 
-            // Initialize control dictionaries
+            // Core dicts
             cadPathTextBoxes = new Dictionary<string, TextBox>();
             availableLayerListBoxes = new Dictionary<string, ListBox>();
             mappedLayerListBoxes = new Dictionary<string, ListBox>();
             elementTypeComboBoxes = new Dictionary<string, ComboBox>();
+
+            // Gravity beam depth dicts
             numInternalGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
             numCantileverGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
+            numNoLoadGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
+            numEDeckGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
+            numPodiumGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
+            numGroundGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
+            numBasementGravityDepthPerFloor = new Dictionary<string, NumericUpDown>();
+
+            // Main beam depth dicts
             numCoreMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
             numPeripheralDeadMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
             numPeripheralPortalMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
             numInternalMainDepthPerFloor = new Dictionary<string, NumericUpDown>();
+
+            // Width override dicts
+            numGravityWidthOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numCoreMainWidthOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numPeripheralDeadMainWidthOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numPeripheralPortalMainWidthOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numInternalMainWidthOverridePerFloor = new Dictionary<string, NumericUpDown>();
+
+            // Slab thickness dicts
             numLobbySlabThicknessPerFloor = new Dictionary<string, NumericUpDown>();
             numStairSlabThicknessPerFloor = new Dictionary<string, NumericUpDown>();
+            numFireTenderSlabPerFloor = new Dictionary<string, NumericUpDown>();
+            numOHTSlabPerFloor = new Dictionary<string, NumericUpDown>();
+            numTerraceFireSlabPerFloor = new Dictionary<string, NumericUpDown>();
+            numUGTSlabPerFloor = new Dictionary<string, NumericUpDown>();
+            numLandscapeSlabPerFloor = new Dictionary<string, NumericUpDown>();
+            numSwimmingSlabPerFloor = new Dictionary<string, NumericUpDown>();
+            numDGSlabPerFloor = new Dictionary<string, NumericUpDown>();
+            numSTPSlabPerFloor = new Dictionary<string, NumericUpDown>();
 
-            // Build UI (calls Part 2)
+            // Wall override dicts
+            numCoreWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numPeriphDeadWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numPeriphPortalWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numInternalWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
+            numNtaWallThicknessPerFloor = new Dictionary<string, NumericUpDown>();
+
             InitializeControlsUI();
         }
 
@@ -795,142 +179,94 @@ namespace ETAB_Automation
 
         internal void BtnLoadCAD_Click(string floorType)
         {
-            OpenFileDialog ofd = new OpenFileDialog
+            var ofd = new OpenFileDialog
             {
                 Filter = "AutoCAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|All Files (*.*)|*.*",
                 Title = $"Select CAD File for {floorType}"
             };
-
             if (ofd.ShowDialog() != DialogResult.OK) return;
 
             cadPathTextBoxes[floorType].Text = ofd.FileName;
-            string extension = System.IO.Path.GetExtension(ofd.FileName).ToLower();
+            string ext = System.IO.Path.GetExtension(ofd.FileName).ToLower();
 
-            if (extension == ".dwg")
+            if (ext == ".dwg")
             {
-                MessageBox.Show(
-                    "DWG files are not directly supported.\n\n" +
-                    "Please convert to DXF format:\n" +
-                    "1. Open in AutoCAD\n" +
-                    "2. Save As → DXF\n" +
-                    "3. Load the DXF file here",
-                    "DWG Not Supported",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                MessageBox.Show("DWG files are not directly supported.\n\nPlease convert to DXF first.",
+                    "DWG Not Supported", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-
-            if (extension != ".dxf")
+            if (ext != ".dxf")
             {
-                MessageBox.Show(
-                    "Please select a DXF file.\n\n" +
-                    "Supported format: .dxf",
-                    "Invalid File Type",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                MessageBox.Show("Please select a DXF file.", "Invalid File Type",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             try
             {
-                CADLayerReader reader = new CADLayerReader();
-                List<string> layers = reader.GetLayerNamesFromFile(ofd.FileName);
+                var reader = new CADLayerReader();
+                var layers = reader.GetLayerNamesFromFile(ofd.FileName);
 
                 if (layers.Count == 0)
                 {
-                    MessageBox.Show(
-                        "No layers found in CAD file.",
-                        "No Layers Found",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
+                    MessageBox.Show("No layers found in CAD file.", "No Layers Found",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 availableLayerListBoxes[floorType].Items.Clear();
                 foreach (string layer in layers)
-                {
                     availableLayerListBoxes[floorType].Items.Add(layer);
-                }
 
                 AutoMapLayers(floorType, layers);
 
-                MessageBox.Show(
-                    $"✓ CAD file loaded!\n\n" +
-                    $"Layers: {layers.Count}\n\n" +
-                    "Auto-mapped based on naming conventions.",
-                    "Layers Loaded",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                MessageBox.Show($"✓ CAD file loaded!\nLayers: {layers.Count}\n\nAuto-mapped by naming convention.",
+                    "Layers Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Error reading CAD file:\n\n{ex.Message}",
-                    "CAD Read Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                MessageBox.Show($"Error reading CAD file:\n\n{ex.Message}", "CAD Read Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void AutoMapLayers(string floorType, List<string> layers)
         {
             mappedLayerListBoxes[floorType].Items.Clear();
-
             foreach (string layer in layers)
             {
+                string u = layer.ToUpperInvariant();
                 string elementType = null;
-
-                if (layer.StartsWith("B-") || layer.Contains("Beam") ||
-                    layer.Contains("BEAM") || layer.Contains("beam"))
-                    elementType = "Beam";
-                else if (layer.Contains("wall") || layer.Contains("Wall") ||
-                         layer.Contains("WALL"))
-                    elementType = "Wall";
-                else if (layer.StartsWith("S-") || layer.Contains("Slab") ||
-                         layer.Contains("SLAB"))
-                    elementType = "Slab";
-
+                if (u.StartsWith("B-") || u.Contains("BEAM")) elementType = "Beam";
+                else if (u.StartsWith("W-") || u.Contains("WALL")) elementType = "Wall";
+                else if (u.StartsWith("S-") || u.Contains("SLAB")) elementType = "Slab";
+                else if (u.StartsWith("C-") || u.Contains("COLUMN")) elementType = "Column";
                 if (elementType != null)
-                {
                     mappedLayerListBoxes[floorType].Items.Add($"{layer} → {elementType}");
-                }
             }
         }
 
         internal void BtnAddMapping_Click(string floorType)
         {
             if (availableLayerListBoxes[floorType].SelectedItem == null)
-            {
-                MessageBox.Show("Please select a layer to map.", "Info");
-                return;
-            }
+            { MessageBox.Show("Please select a layer to map.", "Info"); return; }
 
             string layerName = availableLayerListBoxes[floorType].SelectedItem.ToString();
             string elementType = elementTypeComboBoxes[floorType].SelectedItem.ToString();
-
             if (elementType == "Ignore") return;
 
             string mapping = $"{layerName} → {elementType}";
             if (!mappedLayerListBoxes[floorType].Items.Contains(mapping))
-            {
                 mappedLayerListBoxes[floorType].Items.Add(mapping);
-            }
             else
-            {
                 MessageBox.Show("Layer already mapped.", "Info");
-            }
         }
 
         internal void BtnRemoveMapping_Click(string floorType)
         {
             if (mappedLayerListBoxes[floorType].SelectedItem == null)
-            {
-                MessageBox.Show("Please select a mapping to remove.", "Info");
-                return;
-            }
-
-            mappedLayerListBoxes[floorType].Items.Remove(
-                mappedLayerListBoxes[floorType].SelectedItem);
+            { MessageBox.Show("Please select a mapping to remove.", "Info"); return; }
+            mappedLayerListBoxes[floorType].Items.Remove(mappedLayerListBoxes[floorType].SelectedItem);
         }
 
         // ====================================================================
@@ -939,15 +275,13 @@ namespace ETAB_Automation
 
         private void BtnAddGradeRow_Click(object sender, EventArgs e)
         {
-            int rowIndex = dgvGradeSchedule.Rows.Add();
-            var row = dgvGradeSchedule.Rows[rowIndex];
-
-            row.Cells["Index"].Value = rowIndex;
+            int idx = dgvGradeSchedule.Rows.Add();
+            var row = dgvGradeSchedule.Rows[idx];
+            row.Cells["Index"].Value = idx;
             row.Cells["WallGrade"].Value = "M40";
             row.Cells["FloorsCount"].Value = "1";
             row.Cells["BeamSlabGrade"].Value = "M30";
             row.Cells["FloorRange"].Value = "";
-
             UpdateGradeTotals();
         }
 
@@ -964,123 +298,71 @@ namespace ETAB_Automation
         private void DgvGradeSchedule_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
-
             var row = dgvGradeSchedule.Rows[e.RowIndex];
-
             if (e.ColumnIndex == dgvGradeSchedule.Columns["WallGrade"].Index)
             {
-                string wallGrade = row.Cells["WallGrade"].Value?.ToString();
-                if (!string.IsNullOrEmpty(wallGrade))
-                {
-                    row.Cells["BeamSlabGrade"].Value = CalculateBeamSlabGrade(wallGrade);
-                }
+                string wg = row.Cells["WallGrade"].Value?.ToString();
+                if (!string.IsNullOrEmpty(wg))
+                    row.Cells["BeamSlabGrade"].Value = CalculateBeamSlabGrade(wg);
             }
-
             if (e.ColumnIndex == dgvGradeSchedule.Columns["FloorsCount"].Index)
-            {
                 UpdateGradeTotals();
-            }
         }
 
         private string CalculateBeamSlabGrade(string wallGrade)
         {
             try
             {
-                int wallValue = int.Parse(wallGrade.Replace("M", "").Replace("m", "").Trim());
-                int beamSlabValue = (int)(Math.Ceiling((wallValue * 0.7) / 5.0) * 5);
-                if (beamSlabValue < 30) beamSlabValue = 30;
-                return $"M{beamSlabValue}";
+                int wv = int.Parse(wallGrade.Replace("M", "").Replace("m", "").Trim());
+                int bsv = (int)(Math.Ceiling((wv * 0.7) / 5.0) * 5);
+                return $"M{Math.Max(bsv, 30)}";
             }
-            catch
-            {
-                return "M30";
-            }
+            catch { return "M30"; }
         }
 
         private void ReindexRows()
         {
             for (int i = 0; i < dgvGradeSchedule.Rows.Count; i++)
-            {
                 dgvGradeSchedule.Rows[i].Cells["Index"].Value = i;
-            }
             UpdateFloorRanges();
         }
 
         private void UpdateFloorRanges()
         {
-            int currentFloor = 1;
-
+            int cur = 1;
             for (int i = 0; i < dgvGradeSchedule.Rows.Count; i++)
             {
                 var row = dgvGradeSchedule.Rows[i];
-                string floorsStr = row.Cells["FloorsCount"].Value?.ToString();
-
-                if (int.TryParse(floorsStr, out int floorCount) && floorCount > 0)
-                {
-                    int endFloor = currentFloor + floorCount - 1;
-                    row.Cells["FloorRange"].Value = $"{currentFloor}-{endFloor}";
-                    currentFloor = endFloor + 1;
-                }
+                if (int.TryParse(row.Cells["FloorsCount"].Value?.ToString(), out int fc) && fc > 0)
+                { row.Cells["FloorRange"].Value = $"{cur}-{cur + fc - 1}"; cur += fc; }
                 else
-                {
                     row.Cells["FloorRange"].Value = "";
-                }
             }
         }
 
         internal void UpdateGradeTotals()
         {
-            int totalInSchedule = 0;
-
+            int total = 0;
             foreach (DataGridViewRow row in dgvGradeSchedule.Rows)
-            {
-                string floorsStr = row.Cells["FloorsCount"].Value?.ToString();
-                if (int.TryParse(floorsStr, out int floors))
-                {
-                    totalInSchedule += floors;
-                }
-            }
+                if (int.TryParse(row.Cells["FloorsCount"].Value?.ToString(), out int f)) total += f;
 
-            int requiredTotal = (int)numTotalFloors.Value;
-            bool isValid = totalInSchedule == requiredTotal;
-
-            lblGradeTotal.Text = $"Total floors in schedule: {totalInSchedule} / {requiredTotal}";
-            lblGradeTotal.ForeColor = isValid ?
-                System.Drawing.Color.DarkGreen : System.Drawing.Color.DarkRed;
-
-            if (isValid)
-                lblGradeTotal.Text += " ✓ VALID";
-            else if (totalInSchedule > requiredTotal)
-                lblGradeTotal.Text += " ❌ TOO MANY";
-            else
-                lblGradeTotal.Text += " ❌ TOO FEW";
-
+            int req = (int)numTotalFloors.Value;
+            bool ok = total == req;
+            lblGradeTotal.Text = $"Total floors in schedule: {total} / {req}";
+            lblGradeTotal.ForeColor = ok ? System.Drawing.Color.DarkGreen : System.Drawing.Color.DarkRed;
+            lblGradeTotal.Text += ok ? " ✓ VALID" : (total > req ? " ❌ TOO MANY" : " ❌ TOO FEW");
             UpdateFloorRanges();
         }
 
         internal void UpdateTotalFloorsForGradeSchedule()
         {
             int total = 0;
-
-            // Count individual basement floors
-            if (chkBasement.Checked)
-                total += (int)numBasementLevels.Value;
-
-            if (chkPodium.Checked)
-                total += (int)numPodiumLevels.Value;
-
-            if (chkGround.Checked)
-                total += 1;
-
-            if (chkEDeck.Checked)
-                total += 1;
-
-            if (chkTypical.Checked)
-                total += (int)numTypicalLevels.Value;
-
-            if (chkTerrace.Checked)
-                total += 1;
-
+            if (chkBasement.Checked) total += (int)numBasementLevels.Value;
+            if (chkPodium.Checked) total += (int)numPodiumLevels.Value;
+            if (chkGround.Checked) total += 1;
+            if (chkEDeck.Checked) total += 1;
+            if (chkTypical.Checked) total += (int)numTypicalLevels.Value;
+            if (chkTerrace.Checked) total += 1;
             numTotalFloors.Value = total;
             UpdateGradeTotals();
         }
@@ -1095,11 +377,7 @@ namespace ETAB_Automation
             numBasementHeight.Enabled = chkBasement.Checked;
             UpdateTotalFloorsForGradeSchedule();
         }
-
-        private void NumBasementLevels_ValueChanged(object sender, EventArgs e)
-        {
-            UpdateTotalFloorsForGradeSchedule();
-        }
+        private void NumBasementLevels_ValueChanged(object sender, EventArgs e) => UpdateTotalFloorsForGradeSchedule();
 
         private void ChkPodium_CheckedChanged(object sender, EventArgs e)
         {
@@ -1107,11 +385,7 @@ namespace ETAB_Automation
             numPodiumHeight.Enabled = chkPodium.Checked;
             UpdateTotalFloorsForGradeSchedule();
         }
-
-        private void NumPodiumLevels_ValueChanged(object sender, EventArgs e)
-        {
-            UpdateTotalFloorsForGradeSchedule();
-        }
+        private void NumPodiumLevels_ValueChanged(object sender, EventArgs e) => UpdateTotalFloorsForGradeSchedule();
 
         private void ChkGround_CheckedChanged(object sender, EventArgs e)
         {
@@ -1131,11 +405,7 @@ namespace ETAB_Automation
             numTypicalHeight.Enabled = chkTypical.Checked;
             UpdateTotalFloorsForGradeSchedule();
         }
-
-        private void NumTypicalLevels_ValueChanged(object sender, EventArgs e)
-        {
-            UpdateTotalFloorsForGradeSchedule();
-        }
+        private void NumTypicalLevels_ValueChanged(object sender, EventArgs e) => UpdateTotalFloorsForGradeSchedule();
 
         private void ChkTerrace_CheckedChanged(object sender, EventArgs e)
         {
@@ -1143,10 +413,8 @@ namespace ETAB_Automation
             UpdateTotalFloorsForGradeSchedule();
         }
 
-        private void ChkFoundation_CheckedChanged(object sender, EventArgs e)
-        {
+        private void ChkFoundation_CheckedChanged(object sender, EventArgs e) =>
             numFoundationHeight.Enabled = chkFoundation.Checked;
-        }
 
         // ====================================================================
         // IMPORT VALIDATION AND EXECUTION
@@ -1156,39 +424,26 @@ namespace ETAB_Automation
         {
             try
             {
-                // Validate at least one floor type is selected
                 if (!chkBasement.Checked && !chkPodium.Checked && !chkGround.Checked &&
                     !chkEDeck.Checked && !chkTypical.Checked && !chkTerrace.Checked)
                 {
-                    MessageBox.Show(
-                        "Please select at least one floor type!",
-                        "No Floors Selected",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
+                    MessageBox.Show("Please select at least one floor type!",
+                        "No Floors Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     tabControl.SelectedIndex = 0;
                     return;
                 }
+                if (!ValidateGradeSchedule()) return;
+                if (!CollectFloorConfigs()) return;
 
-                // Validate grade schedule
-                if (!ValidateGradeSchedule())
-                    return;
-
-                // Collect floor configs
-                if (!CollectFloorConfigs())
-                    return;
-
-                SeismicZone = cmbSeismicZone.SelectedItem?.ToString() ?? "Zone IV";
+                SeismicZone = cmbSeismicZone.SelectedItem?.ToString() ?? "Zone IV (Ahmedabad & Kolkata)";
                 FoundationHeight = chkFoundation.Checked ? (double)numFoundationHeight.Value : 0;
 
                 ShowConfirmation();
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Error preparing import:\n\n{ex.Message}",
-                    "Import Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                MessageBox.Show($"Error preparing import:\n\n{ex.Message}", "Import Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1196,55 +451,37 @@ namespace ETAB_Automation
         {
             if (dgvGradeSchedule.Rows.Count == 0)
             {
-                MessageBox.Show(
-                    "No concrete grades defined!\n\n" +
-                    "Please add at least one grade row.",
-                    "Grade Schedule Empty",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                MessageBox.Show("No concrete grades defined!\nPlease add at least one grade row.",
+                    "Grade Schedule Empty", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 tabControl.SelectedIndex = 1;
                 return false;
             }
 
-            WallGrades.Clear();
-            FloorsPerGrade.Clear();
-
+            WallGrades.Clear(); FloorsPerGrade.Clear();
             int totalInSchedule = 0;
+
             foreach (DataGridViewRow row in dgvGradeSchedule.Rows)
             {
-                string wallGrade = row.Cells["WallGrade"].Value?.ToString();
-                string floorsStr = row.Cells["FloorsCount"].Value?.ToString();
-
-                if (string.IsNullOrEmpty(wallGrade) || !int.TryParse(floorsStr, out int floors))
+                string wg = row.Cells["WallGrade"].Value?.ToString();
+                string fs = row.Cells["FloorsCount"].Value?.ToString();
+                if (string.IsNullOrEmpty(wg) || !int.TryParse(fs, out int floors))
                 {
-                    MessageBox.Show(
-                        $"Invalid grade schedule at row {row.Index}.",
-                        "Validation Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
+                    MessageBox.Show($"Invalid grade schedule at row {row.Index}.",
+                        "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     tabControl.SelectedIndex = 1;
                     return false;
                 }
-
-                WallGrades.Add(wallGrade);
-                FloorsPerGrade.Add(floors);
-                totalInSchedule += floors;
+                WallGrades.Add(wg); FloorsPerGrade.Add(floors); totalInSchedule += floors;
             }
 
-            int requiredFloors = (int)numTotalFloors.Value;
-            if (totalInSchedule != requiredFloors)
+            if (totalInSchedule != (int)numTotalFloors.Value)
             {
                 MessageBox.Show(
-                    $"Grade schedule mismatch!\n\n" +
-                    $"Building: {requiredFloors} floors\n" +
-                    $"Schedule: {totalInSchedule} floors",
-                    "Validation Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    $"Grade schedule mismatch!\n\nBuilding: {numTotalFloors.Value} floors\nSchedule: {totalInSchedule} floors",
+                    "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 tabControl.SelectedIndex = 1;
                 return false;
             }
-
             return true;
         }
 
@@ -1252,49 +489,28 @@ namespace ETAB_Automation
         {
             FloorConfigs.Clear();
 
-            // Individual basement floors (B1, B2, B3, B4, B5)
             if (chkBasement.Checked)
             {
-                int basementCount = (int)numBasementLevels.Value;
-                for (int i = 1; i <= basementCount; i++)
-                {
-                    string basementName = $"Basement{i}";
-                    if (!AddFloorConfig(basementName, 1, (double)numBasementHeight.Value))
+                int cnt = (int)numBasementLevels.Value;
+                for (int i = 1; i <= cnt; i++)
+                    if (!AddFloorConfig($"Basement{i}", 1, (double)numBasementHeight.Value))
                         return false;
-                }
             }
-
             if (chkPodium.Checked)
-            {
-                if (!AddFloorConfig("Podium", (int)numPodiumLevels.Value,
-                    (double)numPodiumHeight.Value))
+                if (!AddFloorConfig("Podium", (int)numPodiumLevels.Value, (double)numPodiumHeight.Value))
                     return false;
-            }
-
             if (chkGround.Checked)
-            {
                 if (!AddFloorConfig("Ground", 1, (double)numGroundHeight.Value))
                     return false;
-            }
-
             if (chkEDeck.Checked)
-            {
                 if (!AddFloorConfig("EDeck", 1, (double)numEDeckHeight.Value))
                     return false;
-            }
-
             if (chkTypical.Checked)
-            {
-                if (!AddFloorConfig("Typical", (int)numTypicalLevels.Value,
-                    (double)numTypicalHeight.Value))
+                if (!AddFloorConfig("Typical", (int)numTypicalLevels.Value, (double)numTypicalHeight.Value))
                     return false;
-            }
-
             if (chkTerrace.Checked)
-            {
                 if (!AddFloorConfig("Terrace", 1, (double)numTerraceheight.Value))
                     return false;
-            }
 
             return true;
         }
@@ -1303,129 +519,182 @@ namespace ETAB_Automation
         {
             if (!ValidateFloorConfig(name))
             {
-                MessageBox.Show(
-                    $"Please configure {name} CAD file and layer mappings.",
-                    "Validation Error");
+                MessageBox.Show($"Please configure {name} CAD file and layer mappings.", "Validation Error");
                 return false;
             }
+
+            bool isBasement = false;
+            int bNum = 0;
+            if (name.StartsWith("Basement") && name.Length > 8)
+                isBasement = int.TryParse(name.Substring(8), out bNum);
 
             FloorConfigs.Add(new FloorTypeConfig
             {
                 Name = name,
                 Count = count,
                 Height = height,
+                IsIndividualBasement = isBasement,
+                BasementNumber = bNum,
                 CADFilePath = cadPathTextBoxes[name].Text,
                 LayerMapping = GetLayerMapping(name),
                 BeamDepths = GetBeamDepthsForFloor(name),
-                SlabThicknesses = GetSlabThicknessesForFloor(name)
+                BeamWidthOverrides = GetBeamWidthOverridesForFloor(name),
+                SlabThicknesses = GetSlabThicknessesForFloor(name),
+                WallThicknessOverrides = GetWallThicknessOverridesForFloor(name),
+                NtaWallThickness = (int)numNtaWallThicknessPerFloor[name].Value
             });
-
             return true;
         }
 
-        private Dictionary<string, int> GetBeamDepthsForFloor(string floorType)
+        // ====================================================================
+        // DATA COLLECTION HELPERS
+        // ====================================================================
+
+        /// <summary>
+        /// Returns beam depth for named key; falls back to InternalGravity if dict not populated.
+        /// </summary>
+        private int SafeGetDepth(Dictionary<string, NumericUpDown> dict, string ft, int fallback)
+            => dict.ContainsKey(ft) ? (int)dict[ft].Value : fallback;
+
+        private Dictionary<string, int> GetBeamDepthsForFloor(string ft)
         {
+            int gravDepth = (int)numInternalGravityDepthPerFloor[ft].Value;
             return new Dictionary<string, int>
             {
-                ["InternalGravity"] = (int)numInternalGravityDepthPerFloor[floorType].Value,
-                ["CantileverGravity"] = (int)numCantileverGravityDepthPerFloor[floorType].Value,
-                ["CoreMain"] = (int)numCoreMainDepthPerFloor[floorType].Value,
-                ["PeripheralDeadMain"] = (int)numPeripheralDeadMainDepthPerFloor[floorType].Value,
-                ["PeripheralPortalMain"] = (int)numPeripheralPortalMainDepthPerFloor[floorType].Value,
-                ["InternalMain"] = (int)numInternalMainDepthPerFloor[floorType].Value
+                ["InternalGravity"] = gravDepth,
+                ["CantileverGravity"] = (int)numCantileverGravityDepthPerFloor[ft].Value,
+                ["NoLoadGravity"] = SafeGetDepth(numNoLoadGravityDepthPerFloor, ft, gravDepth),
+                ["EdeckGravity"] = SafeGetDepth(numEDeckGravityDepthPerFloor, ft, gravDepth),
+                ["PodiumGravity"] = SafeGetDepth(numPodiumGravityDepthPerFloor, ft, gravDepth),
+                ["GroundGravity"] = SafeGetDepth(numGroundGravityDepthPerFloor, ft, gravDepth),
+                ["BasementGravity"] = SafeGetDepth(numBasementGravityDepthPerFloor, ft, gravDepth),
+                ["CoreMain"] = (int)numCoreMainDepthPerFloor[ft].Value,
+                ["PeripheralDeadMain"] = (int)numPeripheralDeadMainDepthPerFloor[ft].Value,
+                ["PeripheralPortalMain"] = (int)numPeripheralPortalMainDepthPerFloor[ft].Value,
+                ["InternalMain"] = (int)numInternalMainDepthPerFloor[ft].Value,
             };
         }
 
-        private Dictionary<string, int> GetSlabThicknessesForFloor(string floorType)
+        private Dictionary<string, int> GetBeamWidthOverridesForFloor(string ft)
         {
             return new Dictionary<string, int>
             {
-                ["Lobby"] = (int)numLobbySlabThicknessPerFloor[floorType].Value,
-                ["Stair"] = (int)numStairSlabThicknessPerFloor[floorType].Value
+                ["GravityWidth"] = (int)numGravityWidthOverridePerFloor[ft].Value,
+                ["CoreMainWidth"] = (int)numCoreMainWidthOverridePerFloor[ft].Value,
+                ["PeripheralDeadMainWidth"] = (int)numPeripheralDeadMainWidthOverridePerFloor[ft].Value,
+                ["PeripheralPortalMainWidth"] = (int)numPeripheralPortalMainWidthOverridePerFloor[ft].Value,
+                ["InternalMainWidth"] = (int)numInternalMainWidthOverridePerFloor[ft].Value,
+            };
+        }
+
+        private Dictionary<string, int> GetSlabThicknessesForFloor(string ft)
+        {
+            return new Dictionary<string, int>
+            {
+                ["Lobby"] = (int)numLobbySlabThicknessPerFloor[ft].Value,
+                ["Stair"] = (int)numStairSlabThicknessPerFloor[ft].Value,
+                ["FireTender"] = (int)numFireTenderSlabPerFloor[ft].Value,
+                ["OHT"] = (int)numOHTSlabPerFloor[ft].Value,
+                ["TerraceFire"] = (int)numTerraceFireSlabPerFloor[ft].Value,
+                ["UGT"] = (int)numUGTSlabPerFloor[ft].Value,
+                ["Landscape"] = (int)numLandscapeSlabPerFloor[ft].Value,
+                ["Swimming"] = (int)numSwimmingSlabPerFloor[ft].Value,
+                ["DG"] = (int)numDGSlabPerFloor[ft].Value,
+                ["STP"] = (int)numSTPSlabPerFloor[ft].Value,
+            };
+        }
+
+        private Dictionary<string, int> GetWallThicknessOverridesForFloor(string ft)
+        {
+            return new Dictionary<string, int>
+            {
+                ["CoreWall"] = (int)numCoreWallOverridePerFloor[ft].Value,
+                ["PeriphDeadWall"] = (int)numPeriphDeadWallOverridePerFloor[ft].Value,
+                ["PeriphPortalWall"] = (int)numPeriphPortalWallOverridePerFloor[ft].Value,
+                ["InternalWall"] = (int)numInternalWallOverridePerFloor[ft].Value,
             };
         }
 
         private bool ValidateFloorConfig(string floorType)
         {
-            return cadPathTextBoxes.ContainsKey(floorType) &&
-                   !string.IsNullOrEmpty(cadPathTextBoxes[floorType].Text) &&
-                   mappedLayerListBoxes.ContainsKey(floorType) &&
-                   mappedLayerListBoxes[floorType].Items.Count > 0;
+            return cadPathTextBoxes.ContainsKey(floorType)
+                && !string.IsNullOrEmpty(cadPathTextBoxes[floorType].Text)
+                && mappedLayerListBoxes.ContainsKey(floorType)
+                && mappedLayerListBoxes[floorType].Items.Count > 0;
         }
 
         private Dictionary<string, string> GetLayerMapping(string floorType)
         {
-            Dictionary<string, string> mapping = new Dictionary<string, string>();
-
-            if (mappedLayerListBoxes.ContainsKey(floorType))
+            var mapping = new Dictionary<string, string>();
+            if (!mappedLayerListBoxes.ContainsKey(floorType)) return mapping;
+            foreach (var item in mappedLayerListBoxes[floorType].Items)
             {
-                foreach (var item in mappedLayerListBoxes[floorType].Items)
-                {
-                    string[] parts = item.ToString().Split(new[] { " → " },
-                        StringSplitOptions.None);
-                    if (parts.Length == 2)
-                    {
-                        mapping[parts[0]] = parts[1];
-                    }
-                }
+                string[] parts = item.ToString().Split(new[] { " → " }, StringSplitOptions.None);
+                if (parts.Length == 2) mapping[parts[0]] = parts[1];
             }
-
             return mapping;
         }
+
+        // ====================================================================
+        // CONFIRMATION DIALOG
+        // ====================================================================
 
         private void ShowConfirmation()
         {
             int totalStories = FloorConfigs.Sum(c => c.Count);
             double totalHeight = FloorConfigs.Sum(c => c.Height * c.Count);
 
-            var msg = new System.Text.StringBuilder();
-            msg.AppendLine("CONFIRM IMPORT");
-            msg.AppendLine("═══════════════════════════════════════\n");
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("CONFIRM IMPORT");
+            sb.AppendLine("═══════════════════════════════════════\n");
+            sb.AppendLine($"Building: {totalStories} floors, {totalHeight:F2}m, {SeismicZone}");
+            if (chkFoundation.Checked) sb.AppendLine($"Foundation Height: {FoundationHeight:F2}m");
+            sb.AppendLine($"Types: {string.Join(", ", FloorConfigs.Select(c => $"{c.Name}({c.Count})"))}");
 
-            msg.AppendLine($"Building: {totalStories} floors, {totalHeight:F2}m, {SeismicZone}");
-            if (chkFoundation.Checked)
-                msg.AppendLine($"Foundation Height: {FoundationHeight:F2}m");
-            msg.AppendLine($"Types: {string.Join(", ", FloorConfigs.Select(c => $"{c.Name}({c.Count})"))}\n");
-
-            msg.AppendLine("FLOOR CONFIGS:");
-            foreach (var config in FloorConfigs)
+            sb.AppendLine("\nFLOOR CONFIGS:");
+            foreach (var cfg in FloorConfigs)
             {
-                int gw = (SeismicZone == "Zone II" || SeismicZone == "Zone III") ? 200 : 240;
-                msg.AppendLine($"\n{config.Name}:");
-                msg.AppendLine($"  Beams: Grav {gw}x{config.BeamDepths["InternalGravity"]}, " +
-                    $"Core {config.BeamDepths["CoreMain"]}");
-                msg.AppendLine($"  Slabs: Lobby {config.SlabThicknesses["Lobby"]}mm, " +
-                    $"Stair {config.SlabThicknesses["Stair"]}mm");
+                int gw = GetAutoGravityWidth();
+                int gwOverride = cfg.BeamWidthOverrides.GetValueOrDefault("GravityWidth", 0);
+                int effGW = gwOverride > 0 ? gwOverride : gw;
+
+                sb.AppendLine($"\n{cfg.Name}:");
+                sb.AppendLine($"  Gravity: {effGW}×{cfg.BeamDepths["InternalGravity"]}  " +
+                              $"Cantilever: {effGW}×{cfg.BeamDepths["CantileverGravity"]}");
+                sb.AppendLine($"  Core MB: {cfg.BeamDepths["CoreMain"]}  NTA wall: {cfg.NtaWallThickness}mm");
+                sb.AppendLine($"  Slabs: Lobby {cfg.SlabThicknesses["Lobby"]}, " +
+                              $"Stair {cfg.SlabThicknesses["Stair"]}, " +
+                              $"UGT {cfg.SlabThicknesses["UGT"]}, " +
+                              $"Swimming {cfg.SlabThicknesses["Swimming"]}mm");
             }
 
-            msg.AppendLine("\n\nGRADES:");
+            sb.AppendLine("\nGRADES:");
             int floorStart = 1;
             for (int i = 0; i < WallGrades.Count; i++)
             {
                 string bsg = CalculateBeamSlabGrade(WallGrades[i]);
                 int floorEnd = floorStart + FloorsPerGrade[i] - 1;
-                msg.AppendLine($"  F{floorStart}-{floorEnd}: {WallGrades[i]}/{bsg}");
+                sb.AppendLine($"  F{floorStart}-{floorEnd}: {WallGrades[i]}/{bsg}");
                 floorStart = floorEnd + 1;
             }
 
-            msg.AppendLine("\n═══════════════════════════════════════");
-            msg.AppendLine("Ready to import?");
+            sb.AppendLine("\n═══════════════════════════════════════");
+            sb.AppendLine("Ready to import?");
 
-            var result = MessageBox.Show(
-                msg.ToString(),
-                "Confirm Import",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
+            var result = MessageBox.Show(sb.ToString(), "Confirm Import",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
-            {
-                this.DialogResult = DialogResult.OK;
-                this.Close();
-            }
+            { this.DialogResult = DialogResult.OK; this.Close(); }
+        }
+
+        private int GetAutoGravityWidth()
+        {
+            string zone = cmbSeismicZone.SelectedItem?.ToString() ?? "";
+            return (zone.Contains("II") || zone.Contains("III")) ? 200 : 240;
         }
     }
 }
-
 // ============================================================================
 // END OF PART 1
 // ============================================================================

@@ -1,659 +1,9 @@
-﻿//// ============================================================================
-//// FILE: UI/ImportConfigFormUI.cs (PART 2 - UI Initialization)
-//// ============================================================================
-//// PURPOSE: UI initialization and tab creation for ImportConfigForm
-//// AUTHOR: ETAB Automation Team
-//// VERSION: 2.1 (Split into 2 parts)
-//// ============================================================================
-
-//using System;
-//using System.Collections.Generic;
-//using System.Windows.Forms;
-
-//namespace ETAB_Automation
-//{
-//    /// <summary>
-//    /// Part 2: UI initialization methods
-//    /// This is a partial class that extends ImportConfigForm
-//    /// </summary>
-//    public partial class ImportConfigForm
-//    {
-//        // ====================================================================
-//        // TOOLTIP COMPONENT
-//        // ====================================================================
-
-//        private ToolTip toolTip;
-
-//        // ====================================================================
-//        // MAIN UI INITIALIZATION
-//        // ====================================================================
-
-//        /// <summary>
-//        /// Initialize all UI controls and tabs
-//        /// Called from constructor in Part 1
-//        /// </summary>
-//        internal void InitializeControlsUI()
-//        {
-//            // Initialize tooltip
-//            toolTip = new ToolTip
-//            {
-//                AutoPopDelay = 5000,
-//                InitialDelay = 500,
-//                ReshowDelay = 200,
-//                ShowAlways = true
-//            };
-
-//            // Set form properties
-//            this.Size = new System.Drawing.Size(900, 750);
-//            this.StartPosition = FormStartPosition.CenterScreen;
-//            this.Text = "Import CAD & Configure Building - Multi-Floor Types";
-
-//            // Create main tab control
-//            tabControl = new TabControl
-//            {
-//                Location = new System.Drawing.Point(10, 10),
-//                Size = new System.Drawing.Size(870, 630)
-//            };
-//            this.Controls.Add(tabControl);
-
-//            // Tab 1: Building Configuration
-//            TabPage tabBuilding = new TabPage("Building Configuration");
-//            tabControl.TabPages.Add(tabBuilding);
-//            InitializeBuildingConfigTab(tabBuilding);
-
-//            // Tab 2: Concrete Grade Schedule
-//            TabPage tabGradeSchedule = new TabPage("Concrete Grades");
-//            tabControl.TabPages.Add(tabGradeSchedule);
-//            InitializeGradeScheduleTab(tabGradeSchedule);
-
-//            // Action buttons
-//            btnImport = new Button
-//            {
-//                Text = "Import to ETABS",
-//                Location = new System.Drawing.Point(600, 660),
-//                Size = new System.Drawing.Size(140, 40),
-//                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
-//            };
-//            btnImport.Click += BtnImport_Click;
-//            this.Controls.Add(btnImport);
-
-//            btnCancel = new Button
-//            {
-//                Text = "Cancel",
-//                Location = new System.Drawing.Point(750, 660),
-//                Size = new System.Drawing.Size(130, 40),
-//                DialogResult = DialogResult.Cancel
-//            };
-//            this.Controls.Add(btnCancel);
-//            this.CancelButton = btnCancel;
-//        }
-
-//        // ====================================================================
-//        // BUILDING CONFIGURATION TAB
-//        // ====================================================================
-
-//        private void InitializeBuildingConfigTab(TabPage tab)
-//        {
-//            tab.AutoScroll = true;
-//            int y = 20;
-
-//            // Header
-//            AddLabel(tab, "📋 Define building structure: Basement → Podium → E-Deck → Typical", 
-//                20, y, 800, 25, bold: true, color: System.Drawing.Color.DarkBlue);
-//            y += 35;
-
-
-//            //Foundation
-//            var grpFoundation = AddGroupBox(tab, "Foundation", 20, y, 820, 90);
-//            chkFoundation = AddCheckBox(grpFoundation, "Include Basement to Foundation height", 20, 25);
-//            chkFoundation.CheckedChanged += ChkFoundation_CheckedChanged;
-//            AddLabel(grpFoundation, "Foundation Height (m):", 40, 52);
-//            numFoundationHeight = AddNumeric(grpFoundation, 200, 50, 0.5M, 5.0M, 1.5M, decimals: 2, enabled: false);
-//            AddLabel(grpFoundation, "(Distance from Basement bottom to foundation level)", 290, 52, 500,20,
-//                italic: true, color: System.Drawing.Color.Gray);
-//            y += 100;
-
-
-//            // Basement
-//            var grpBasement = AddGroupBox(tab, "Basement Floors", 20, y, 820, 120);
-//            chkBasement = AddCheckBox(grpBasement, "Include Basement Floors", 20, 25);
-//            chkBasement.CheckedChanged += ChkBasement_CheckedChanged;
-
-//            AddLabel(grpBasement, "Number of Basements(1-5):", 40, 52);
-
-//            numBasementLevels = AddNumeric(grpBasement, 230, 50, 1, 5,1, enabled: false);
-//            numBasementLevels.ValueChanged += NumBasementLevels_ValueChanged;
-//            AddLabel(grpBasement, "Each Basement Height (m):", 340, 52);
-//            numBasementHeight = AddNumeric(grpBasement, 530, 50, 2.5M, 6.0M, 3.5M, 
-//                decimals: 2, enabled: false);
-//            y += 100;
-
-//            // Podium
-//            var grpPodium = AddGroupBox(tab, "Podium Floors", 20, y, 820, 90);
-//            chkPodium = AddCheckBox(grpPodium, "Include Podium Floors", 20, 25);
-//            chkPodium.CheckedChanged += ChkPodium_CheckedChanged;
-//            AddLabel(grpPodium, "Number of Podiums:", 40, 52);
-//            numPodiumLevels = AddNumeric(grpPodium, 200, 50, 1, 5, 1, enabled: false);
-//            AddLabel(grpPodium, "Podium Height (m):", 320, 52);
-//            numPodiumHeight = AddNumeric(grpPodium, 480, 50, 3.0M, 8.0M, 4.5M, 
-//                decimals: 2, enabled: false);
-//            y += 100;
-
-//            // E-Deck
-//            var grpEDeck = AddGroupBox(tab, "E-Deck (Ground Floor)", 20, y, 820, 70);
-//            AddLabel(grpEDeck, "E-Deck Height (m):", 40, 32);
-//            numEDeckHeight = AddNumeric(grpEDeck, 200, 30, 3.0M, 10.0M, 4.5M, decimals: 2);
-//            AddLabel(grpEDeck, "(Ground floor is mandatory)", 290, 32, 
-//                italic: true, color: System.Drawing.Color.Gray);
-//            y += 80;
-
-//            // Typical
-//            var grpTypical = AddGroupBox(tab, "Typical Floors (Above E-Deck)", 20, y, 820, 90);
-//            AddLabel(grpTypical, "Number of Typical Floors:", 40, 32);
-//            numTypicalLevels = AddNumeric(grpTypical, 210, 30, 1, 100, 10);
-//            AddLabel(grpTypical, "Typical Floor Height (m):", 320, 32);
-//            numTypicalHeight = AddNumeric(grpTypical, 490, 30, 2.8M, 5.0M, 3.0M, decimals: 2);
-//            y += 100;
-
-//            // Terrace
-//            var grpTerrace = AddGroupBox(tab, "Terrace Floor", 20, y, 820, 90);
-//            chkTerrace = AddCheckBox(grpTerrace, "Include Terrace Floor", 20, 25);
-//            chkTerrace.CheckedChanged += ChkTerrace_CheckedChanged;
-//            AddLabel(grpTerrace, "Terrace Height (m):", 40, 52);
-//            numTerraceheight = AddNumeric(grpTerrace, 200, 50, 2.8M, 5.0M, 3.0M, 
-//                decimals: 2, enabled: false);
-//            y += 100;
-
-//            // Seismic Zone
-//            var grpSeismic = AddGroupBox(tab, "Seismic Parameters", 20, y, 820, 70);
-//            AddLabel(grpSeismic, "Seismic Zone:", 40, 32, 120, 20);
-
-//            cmbSeismicZone = new ComboBox
-//            {
-//                Location = new System.Drawing.Point(170, 30),
-//                Size = new System.Drawing.Size(150, 25),
-//                DropDownStyle = ComboBoxStyle.DropDownList
-//            };
-//            cmbSeismicZone.Items.AddRange(new object[] { "Zone II", "Zone III", "Zone IV", "Zone V" });
-//            cmbSeismicZone.SelectedIndex = 2;
-//            grpSeismic.Controls.Add(cmbSeismicZone);
-
-//            AddLabel(grpSeismic, "Affects gravity beam width: Zone II/III = 200mm, Zone IV/V = 240mm", 
-//                330, 32, 470, 20, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
-//            y += 80;
-
-//            // Generate Tabs Button
-//            Button btnGen = new Button
-//            {
-//                Text = "Generate CAD Import Tabs →",
-//                Location = new System.Drawing.Point(320, y),
-//                Size = new System.Drawing.Size(200, 40),
-//                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
-//                BackColor = System.Drawing.Color.LightGreen
-//            };
-//            btnGen.Click += BtnGenerateTabs_Click;
-//            tab.Controls.Add(btnGen);
-//        }
-
-//        // ====================================================================
-//        // GRADE SCHEDULE TAB
-//        // ====================================================================
-
-//        private void InitializeGradeScheduleTab(TabPage tab)
-//        {
-//            tab.AutoScroll = true;
-//            int y = 20;
-
-//            // Header
-//            AddLabel(tab, "🏗️ CONCRETE GRADE SCHEDULE - Define wall grades from bottom to top", 
-//                20, y, 800, 25, bold: true, color: System.Drawing.Color.DarkBlue, fontSize: 10);
-//            y += 35;
-
-//            // Note
-//            AddLabel(tab, "⚠️ Total floors in grade schedule MUST equal total building floors\n" +
-//                "Beam/Slab grades are auto-calculated as 0.7× wall grade (rounded to nearest 5)", 
-//                20, y, 800, 35, italic: true, color: System.Drawing.Color.DarkRed);
-//            y += 50;
-
-//            // Total floors
-//            AddLabel(tab, "Total Building Floors:", 20, y, bold: true);
-//            numTotalFloors = new NumericUpDown
-//            {
-//                Location = new System.Drawing.Point(180, y),
-//                Size = new System.Drawing.Size(80, 25),
-//                ReadOnly = true,
-//                Enabled = false,
-//                Value = 0,
-//                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
-//            };
-//            tab.Controls.Add(numTotalFloors);
-//            AddLabel(tab, "(Auto-calculated from Building Configuration tab)", 
-//                270, y + 2, italic: true, color: System.Drawing.Color.Gray);
-//            y += 40;
-
-//            // DataGrid
-//            dgvGradeSchedule = new DataGridView
-//            {
-//                Location = new System.Drawing.Point(20, y),
-//                Size = new System.Drawing.Size(820, 300),
-//                AllowUserToAddRows = false,
-//                AllowUserToDeleteRows = false,
-//                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-//                MultiSelect = false,
-//                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
-//            };
-
-//            dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-//            {
-//                Name = "Index",
-//                HeaderText = "Row",
-//                ReadOnly = true,
-//                Width = 60
-//            });
-
-//            dgvGradeSchedule.Columns.Add(new DataGridViewComboBoxColumn
-//            {
-//                Name = "WallGrade",
-//                HeaderText = "Wall Concrete Grade from bottom",
-//                DataSource = new List<string> { "M20", "M25", "M30", "M35", "M40", "M45", "M50", "M55", "M60" },
-//                Width = 200
-//            });
-
-//            dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-//            {
-//                Name = "FloorsCount",
-//                HeaderText = "No. of floors Concrete Grade from bottom",
-//                Width = 250
-//            });
-
-//            dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-//            {
-//                Name = "BeamSlabGrade",
-//                HeaderText = "Beam/Slab Grade (Auto)",
-//                ReadOnly = true,
-//                Width = 150
-//            });
-
-//            dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-//            {
-//                Name = "FloorRange",
-//                HeaderText = "Floor Range",
-//                ReadOnly = true,
-//                Width = 150
-//            });
-
-//            dgvGradeSchedule.CellValueChanged += DgvGradeSchedule_CellValueChanged;
-//            dgvGradeSchedule.CurrentCellDirtyStateChanged += (s, e) =>
-//            {
-//                if (dgvGradeSchedule.IsCurrentCellDirty)
-//                    dgvGradeSchedule.CommitEdit(DataGridViewDataErrorContexts.Commit);
-//            };
-
-//            tab.Controls.Add(dgvGradeSchedule);
-//            y += 310;
-
-//            // Buttons
-//            btnAddGradeRow = new Button
-//            {
-//                Text = "➕ Add Grade Row",
-//                Location = new System.Drawing.Point(20, y),
-//                Size = new System.Drawing.Size(150, 35),
-//                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
-//            };
-//            btnAddGradeRow.Click += BtnAddGradeRow_Click;
-//            tab.Controls.Add(btnAddGradeRow);
-
-//            btnRemoveGradeRow = new Button
-//            {
-//                Text = "➖ Remove Selected Row",
-//                Location = new System.Drawing.Point(180, y),
-//                Size = new System.Drawing.Size(170, 35)
-//            };
-//            btnRemoveGradeRow.Click += BtnRemoveGradeRow_Click;
-//            tab.Controls.Add(btnRemoveGradeRow);
-
-//            lblGradeTotal = new Label
-//            {
-//                Text = "Total floors in schedule: 0 / 0",
-//                Location = new System.Drawing.Point(370, y + 8),
-//                Size = new System.Drawing.Size(400, 25),
-//                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
-//                ForeColor = System.Drawing.Color.DarkRed
-//            };
-//            tab.Controls.Add(lblGradeTotal);
-
-//            UpdateTotalFloorsForGradeSchedule();
-//        }
-
-//        // ====================================================================
-//        // DYNAMIC CAD IMPORT TAB CREATION
-//        // ====================================================================
-
-//        internal void CreateCADImportTab(string floorType, string description)
-//        {
-//            TabPage tab = new TabPage($"{floorType} - CAD Import");
-//            tab.AutoScroll = true;
-//            tabControl.TabPages.Add(tab);
-
-//            int y = 10;
-
-//            AddLabel(tab, $"📐 {description}", 20, y, 800, 25, bold: true, 
-//                color: System.Drawing.Color.DarkGreen);
-//            y += 35;
-
-//            // CAD File
-//            AddLabel(tab, "CAD File:", 20, y);
-//            TextBox txtCAD = new TextBox
-//            {
-//                Location = new System.Drawing.Point(120, y - 2),
-//                Size = new System.Drawing.Size(540, 25),
-//                ReadOnly = true
-//            };
-//            tab.Controls.Add(txtCAD);
-//            cadPathTextBoxes[floorType] = txtCAD;
-
-//            Button btnLoad = new Button
-//            {
-//                Text = "Browse...",
-//                Location = new System.Drawing.Point(670, y - 4),
-//                Size = new System.Drawing.Size(120, 28)
-//            };
-//            btnLoad.Click += (s, ev) => BtnLoadCAD_Click(floorType);
-//            tab.Controls.Add(btnLoad);
-//            y += 40;
-
-//            // Layer Mapping
-//            AddLayerMappingUI(tab, floorType, ref y);
-
-//            // Beam Depths
-//            AddBeamDepthsUI(tab, floorType, ref y);
-
-//            // Slab Thicknesses
-//            AddSlabThicknessesUI(tab, floorType, ref y);
-//        }
-
-//        private void AddLayerMappingUI(TabPage tab, string floorType, ref int y)
-//        {
-//            AddLabel(tab, "Available CAD Layers:", 20, y);
-
-//            ListBox lstAvail = new ListBox
-//            {
-//                Location = new System.Drawing.Point(20, y + 25),
-//                Size = new System.Drawing.Size(280, 250)
-//            };
-//            tab.Controls.Add(lstAvail);
-//            availableLayerListBoxes[floorType] = lstAvail;
-
-//            AddLabel(tab, "Assign as:", 320, y + 25);
-
-//            ComboBox cboElem = new ComboBox
-//            {
-//                Location = new System.Drawing.Point(320, y + 50),
-//                Size = new System.Drawing.Size(140, 25),
-//                DropDownStyle = ComboBoxStyle.DropDownList
-//            };
-//            cboElem.Items.AddRange(new object[] { "Beam", "Wall", "Slab", "Ignore" });
-//            cboElem.SelectedIndex = 0;
-//            tab.Controls.Add(cboElem);
-//            elementTypeComboBoxes[floorType] = cboElem;
-
-//            Button btnAdd = new Button
-//            {
-//                Text = "Add →",
-//                Location = new System.Drawing.Point(320, y + 85),
-//                Size = new System.Drawing.Size(140, 35)
-//            };
-//            btnAdd.Click += (s, ev) => BtnAddMapping_Click(floorType);
-//            tab.Controls.Add(btnAdd);
-
-//            Button btnRem = new Button
-//            {
-//                Text = "← Remove",
-//                Location = new System.Drawing.Point(320, y + 130),
-//                Size = new System.Drawing.Size(140, 35)
-//            };
-//            btnRem.Click += (s, ev) => BtnRemoveMapping_Click(floorType);
-//            tab.Controls.Add(btnRem);
-
-//            AddLabel(tab, "Layer Mappings:", 480, y);
-
-//            ListBox lstMap = new ListBox
-//            {
-//                Location = new System.Drawing.Point(480, y + 25),
-//                Size = new System.Drawing.Size(310, 250)
-//            };
-//            tab.Controls.Add(lstMap);
-//            mappedLayerListBoxes[floorType] = lstMap;
-
-//            y += 290;
-//        }
-
-//		private void AddBeamDepthsUI(TabPage tab, string floorType, ref int y)
-//		{
-//			var grp = AddGroupBox(tab, $"🔧 Beam Depths for {floorType} (mm)", 20, y, 820, 180);
-
-//			int gw = (cmbSeismicZone.SelectedItem?.ToString() == "Zone II" ||
-//					 cmbSeismicZone.SelectedItem?.ToString() == "Zone III") ? 200 : 240;
-
-//			AddLabel(grp, $"Gravity Beam Width: {gw}mm (auto) | Main Beam Width: Matches wall",
-//				15, 20, 790, 20, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
-
-//			// Column 1 - Gravity beams
-//			var lblIntGrav = new Label
-//			{
-//				Text = "Internal Gravity:",
-//				Location = new System.Drawing.Point(20, 50),
-//				AutoSize = true
-//			};
-//			grp.Controls.Add(lblIntGrav);
-//			numInternalGravityDepthPerFloor[floorType] =
-//				AddNumeric(grp, 175, 48, 200, 1000, 450, increment: 25);
-
-//			var lblCantGrav = new Label
-//			{
-//				Text = "Cantilever Gravity:",
-//				Location = new System.Drawing.Point(20, 85),
-//				AutoSize = true
-//			};
-//			grp.Controls.Add(lblCantGrav);
-//			numCantileverGravityDepthPerFloor[floorType] =
-//				AddNumeric(grp, 175, 83, 200, 1000, 500, increment: 25);
-
-//			// Column 2 - Main beams (part 1)
-//			var lblCoreMain = new Label
-//			{
-//				Text = "Core Main:",
-//				Location = new System.Drawing.Point(300, 50),
-//				AutoSize = true
-//			};
-//			grp.Controls.Add(lblCoreMain);
-//			numCoreMainDepthPerFloor[floorType] =
-//				AddNumeric(grp, 425, 48, 300, 1500, 600, increment: 25);
-
-//			var lblPeriDead = new Label
-//			{
-//				Text = "Peripheral Dead:",
-//				Location = new System.Drawing.Point(300, 85),
-//				AutoSize = true
-//			};
-//			grp.Controls.Add(lblPeriDead);
-//			numPeripheralDeadMainDepthPerFloor[floorType] =
-//				AddNumeric(grp, 425, 83, 300, 1500, 600, increment: 25);
-
-//			// Column 3 - Main beams (part 2)
-//			var lblPeriPortal = new Label
-//			{
-//				Text = "Peripheral Portal:",
-//				Location = new System.Drawing.Point(550, 50),
-//				AutoSize = true
-//			};
-//			grp.Controls.Add(lblPeriPortal);
-//			numPeripheralPortalMainDepthPerFloor[floorType] =
-//				AddNumeric(grp, 675, 48, 300, 1500, 650, increment: 25);
-
-//			var lblIntMain = new Label
-//			{
-//				Text = "Internal Main:",
-//				Location = new System.Drawing.Point(550, 85),
-//				AutoSize = true
-//			};
-//			grp.Controls.Add(lblIntMain);
-//			numInternalMainDepthPerFloor[floorType] =
-//				AddNumeric(grp, 675, 83, 300, 1500, 550, increment: 25);
-
-//			AddLabel(grp, "💡 All depths in mm. Widths auto-set based on type and seismic zone.",
-//				20, 130, 780, 35, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 8);
-
-//			y += 190;
-//		}
-//		private void AddSlabThicknessesUI(TabPage tab, string floorType, ref int y)
-//        {
-//            var grp = AddGroupBox(tab, $"🔧 Slab Thicknesses for {floorType} (mm)", 20, y, 820, 120);
-
-//            AddLabel(grp, "Regular slabs auto-determined by area (14-70 m²). Configure special cases below:", 
-//                15, 20, 790, 20, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
-
-//            AddLabel(grp, "Lobby Slab:", 40, 50);
-//            numLobbySlabThicknessPerFloor[floorType] = 
-//                AddNumeric(grp, 195, 48, 100, 300, 160, increment: 5);
-
-//            AddLabel(grp, "Stair Slab:", 320, 50);
-//            numStairSlabThicknessPerFloor[floorType] = 
-//                AddNumeric(grp, 475, 48, 125, 250, 175, increment: 5);
-
-//            AddLabel(grp, "💡 Cantilever slabs use span-based rules (1.0-5.0m → 125-200mm)", 
-//                40, 85, 750, 20, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 8);
-//        }
-
-//        private void BtnGenerateTabs_Click(object sender, EventArgs e)
-//        {
-//            // Remove old tabs
-//            while (tabControl.TabPages.Count > 2)
-//                tabControl.TabPages.RemoveAt(2);
-
-//            // Clear dictionaries
-//            cadPathTextBoxes.Clear();
-//            availableLayerListBoxes.Clear();
-//            mappedLayerListBoxes.Clear();
-//            elementTypeComboBoxes.Clear();
-//            numInternalGravityDepthPerFloor.Clear();
-//            numCantileverGravityDepthPerFloor.Clear();
-//            numCoreMainDepthPerFloor.Clear();
-//            numPeripheralDeadMainDepthPerFloor.Clear();
-//            numPeripheralPortalMainDepthPerFloor.Clear();
-//            numInternalMainDepthPerFloor.Clear();
-//            numLobbySlabThicknessPerFloor.Clear();
-//            numStairSlabThicknessPerFloor.Clear();
-
-//            // Generate tabs
-//            if (chkBasement.Checked)
-//                CreateCADImportTab("Basement", "Basement Floor Plan");
-
-//            if (chkPodium.Checked)
-//                CreateCADImportTab("Podium", "Podium Floor Plan");
-
-//            CreateCADImportTab("EDeck", "E-Deck (Ground) Floor Plan");
-//            CreateCADImportTab("Typical", "Typical Floor Plan (Will be replicated)");
-
-//            if (chkTerrace.Checked)
-//                CreateCADImportTab("Terrace", "Terrace Floor Plan");
-
-//            UpdateTotalFloorsForGradeSchedule();
-
-//            MessageBox.Show(
-//                "CAD Import tabs generated!\n\n" +
-//                "Each floor type has its own beam and slab configuration.\n\n" +
-//                "Please:\n" +
-//                "1. Upload CAD files and map layers\n" +
-//                "2. Configure beam depths and slab thicknesses\n" +
-//                "3. Complete Concrete Grades schedule",
-//                "Tabs Generated",
-//                MessageBoxButtons.OK,
-//                MessageBoxIcon.Information);
-//        }
-
-//        // ====================================================================
-//        // UI HELPER METHODS
-//        // ====================================================================
-
-//        private Label AddLabel(Control parent, string text, int x, int y, 
-//            int width = 150, int height = 20, bool bold = false, bool italic = false, 
-//            System.Drawing.Color? color = null, float fontSize = 9F)
-//        {
-//            var style = System.Drawing.FontStyle.Regular;
-//            if (bold) style |= System.Drawing.FontStyle.Bold;
-//            if (italic) style |= System.Drawing.FontStyle.Italic;
-
-//            var lbl = new Label
-//            {
-//                Text = text,
-//                Location = new System.Drawing.Point(x, y),
-//                Size = new System.Drawing.Size(width, height),
-//                Font = new System.Drawing.Font("Segoe UI", fontSize, style)
-//            };
-
-//            if (color.HasValue)
-//                lbl.ForeColor = color.Value;
-
-//            parent.Controls.Add(lbl);
-//            return lbl;
-//        }
-
-//        private GroupBox AddGroupBox(Control parent, string text, int x, int y, 
-//            int width, int height)
-//        {
-//            var grp = new GroupBox
-//            {
-//                Text = text,
-//                Location = new System.Drawing.Point(x, y),
-//                Size = new System.Drawing.Size(width, height)
-//            };
-//            parent.Controls.Add(grp);
-//            return grp;
-//        }
-
-//        private CheckBox AddCheckBox(Control parent, string text, int x, int y)
-//        {
-//            var chk = new CheckBox
-//            {
-//                Text = text,
-//                Location = new System.Drawing.Point(x, y),
-//                Size = new System.Drawing.Size(200, 20)
-//            };
-//            parent.Controls.Add(chk);
-//            return chk;
-//        }
-
-//        private NumericUpDown AddNumeric(Control parent, int x, int y, 
-//            decimal min, decimal max, decimal value, int decimals = 0, 
-//            decimal increment = 1, bool enabled = true)
-//        {
-//            var num = new NumericUpDown
-//            {
-//                Location = new System.Drawing.Point(x, y),
-//                Size = new System.Drawing.Size(80, 25),
-//                Minimum = min,
-//                Maximum = max,
-//                Value = value,
-//                DecimalPlaces = decimals,
-//                Increment = increment,
-//                Enabled = enabled
-//            };
-//            parent.Controls.Add(num);
-//            return num;
-//        }
-//    }
-//}
-
-//// ============================================================================
-//// END OF PART 2
-//// ============================================================================
+﻿
 // ============================================================================
 // FILE: UI/ImportConfigFormUI.cs (PART 2 - UI Initialization)
 // ============================================================================
 // PURPOSE: UI initialization and tab creation for ImportConfigForm
-// AUTHOR: ETAB Automation Team
-// VERSION: 2.2 (Updated for individual basement floors and ground floor)
+// VERSION: 2.5 — Clean fixed-grid layout, no overlaps
 // ============================================================================
 
 using System;
@@ -662,67 +12,64 @@ using System.Windows.Forms;
 
 namespace ETAB_Automation
 {
-    /// <summary>
-    /// Part 2: UI initialization methods
-    /// This is a partial class that extends ImportConfigForm
-    /// </summary>
     public partial class ImportConfigForm
     {
-        // ====================================================================
-        // TOOLTIP COMPONENT
-        // ====================================================================
-
         private ToolTip toolTip;
+
+        // ====================================================================
+        // LAYOUT CONSTANTS
+        // ====================================================================
+        // Three-column grid used throughout beam / wall / slab sections:
+        //
+        //  Col 1:  label @  20  | numeric @ 210   (label width 185)
+        //  Col 2:  label @ 320  | numeric @ 510   (label width 185)
+        //  Col 3:  label @ 620  | numeric @ 800   (label width 175)
+        //
+        // NumericUpDown width: 85  Height: 25
+        // Row height: 32
+
+        private const int C1L = 20, C1N = 210;
+        private const int C2L = 320, C2N = 510;
+        private const int C3L = 620, C3N = 800;
+        private const int NW = 85;   // numeric width
+        private const int NH = 25;   // numeric height
+        private const int RH = 32;   // row height
 
         // ====================================================================
         // MAIN UI INITIALIZATION
         // ====================================================================
 
-        /// <summary>
-        /// Initialize all UI controls and tabs
-        /// Called from constructor in Part 1
-        /// </summary>
         internal void InitializeControlsUI()
         {
-            // Initialize tooltip
             toolTip = new ToolTip
-            {
-                AutoPopDelay = 5000,
-                InitialDelay = 500,
-                ReshowDelay = 200,
-                ShowAlways = true
-            };
+            { AutoPopDelay = 5000, InitialDelay = 500, ReshowDelay = 200, ShowAlways = true };
 
-            // Set form properties
-            this.Size = new System.Drawing.Size(900, 750);
+            this.Size = new System.Drawing.Size(980, 840);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Text = "Import CAD & Configure Building - Multi-Floor Types";
+            this.Text = "ETABS CAD Import Configuration v2.5";
 
-            // Create main tab control
             tabControl = new TabControl
             {
                 Location = new System.Drawing.Point(10, 10),
-                Size = new System.Drawing.Size(870, 630)
+                Size = new System.Drawing.Size(950, 730)
             };
             this.Controls.Add(tabControl);
 
-            // Tab 1: Building Configuration
-            TabPage tabBuilding = new TabPage("Building Configuration");
+            var tabBuilding = new TabPage("Building Config");
             tabControl.TabPages.Add(tabBuilding);
             InitializeBuildingConfigTab(tabBuilding);
 
-            // Tab 2: Concrete Grade Schedule
-            TabPage tabGradeSchedule = new TabPage("Concrete Grades");
-            tabControl.TabPages.Add(tabGradeSchedule);
-            InitializeGradeScheduleTab(tabGradeSchedule);
+            var tabGrade = new TabPage("Concrete Grades");
+            tabControl.TabPages.Add(tabGrade);
+            InitializeGradeScheduleTab(tabGrade);
 
-            // Action buttons
             btnImport = new Button
             {
-                Text = "Import to ETABS",
-                Location = new System.Drawing.Point(600, 660),
-                Size = new System.Drawing.Size(140, 40),
-                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
+                Text = "▶  Import to ETABS",
+                Location = new System.Drawing.Point(680, 752),
+                Size = new System.Drawing.Size(155, 42),
+                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
+                BackColor = System.Drawing.Color.LightGreen
             };
             btnImport.Click += BtnImport_Click;
             this.Controls.Add(btnImport);
@@ -730,8 +77,8 @@ namespace ETAB_Automation
             btnCancel = new Button
             {
                 Text = "Cancel",
-                Location = new System.Drawing.Point(750, 660),
-                Size = new System.Drawing.Size(130, 40),
+                Location = new System.Drawing.Point(845, 752),
+                Size = new System.Drawing.Size(110, 42),
                 DialogResult = DialogResult.Cancel
             };
             this.Controls.Add(btnCancel);
@@ -747,115 +94,109 @@ namespace ETAB_Automation
             tab.AutoScroll = true;
             int y = 20;
 
-            // Header
             AddLabel(tab, "📋 Define building structure from bottom to top (all floors are optional)",
-                20, y, 800, 25, bold: true, color: System.Drawing.Color.DarkBlue);
+                20, y, 900, 25, bold: true, color: System.Drawing.Color.DarkBlue);
             y += 35;
 
             // Foundation
-            var grpFoundation = AddGroupBox(tab, "Foundation", 20, y, 820, 90);
-            chkFoundation = AddCheckBox(grpFoundation, "Include Basement to Foundation Height", 20, 25);
+            var grpF = AddGroupBox(tab, "Foundation", 20, y, 910, 85);
+            chkFoundation = AddCheckBox(grpF, "Include Foundation to Basement height", 15, 25);
             chkFoundation.CheckedChanged += ChkFoundation_CheckedChanged;
-            AddLabel(grpFoundation, "Foundation Height (m):", 40, 52);
-            numFoundationHeight = AddNumeric(grpFoundation, 200, 50, 0.5M, 5.0M, 1.5M,
-                decimals: 2, enabled: false);
-            AddLabel(grpFoundation, "(Distance from basement bottom to foundation level)",
-                290, 52, 500, 20, italic: true, color: System.Drawing.Color.Gray);
-            y += 100;
+            AddLabel(grpF, "Foundation Height (m):", 35, 52, 160, 20);
+            numFoundationHeight = AddNumericCtrl(grpF, 200, 50, 0.5M, 5.0M, 1.5M, decimals: 2, enabled: false);
+            AddLabel(grpF, "(Distance from basement bottom to foundation level)",
+                295, 52, 580, 20, italic: true, color: System.Drawing.Color.Gray);
+            y += 95;
 
-            // Basement (Individual floors)
-            var grpBasement = AddGroupBox(tab, "Basement Floors (Individual Plans)", 20, y, 820, 120);
-            chkBasement = AddCheckBox(grpBasement, "Include Basement Floors", 20, 25);
+            // Basement
+            var grpB = AddGroupBox(tab, "Basement Floors  (each floor requires its own CAD plan)", 20, y, 910, 108);
+            chkBasement = AddCheckBox(grpB, "Include Basement Floors", 15, 25);
             chkBasement.CheckedChanged += ChkBasement_CheckedChanged;
-            AddLabel(grpBasement, "Number of Basements (1-5):", 40, 52);
-            numBasementLevels = AddNumeric(grpBasement, 230, 50, 1, 5, 1, enabled: false);
+            AddLabel(grpB, "Number of Basements (1–5):", 35, 52, 200, 20);
+            numBasementLevels = AddNumericCtrl(grpB, 240, 50, 1, 5, 1, enabled: false);
             numBasementLevels.ValueChanged += NumBasementLevels_ValueChanged;
-            AddLabel(grpBasement, "Each Basement Height (m):", 340, 52);
-            numBasementHeight = AddNumeric(grpBasement, 530, 50, 2.5M, 6.0M, 3.5M,
-                decimals: 2, enabled: false);
-            AddLabel(grpBasement, "⚠️ Each basement floor requires its own CAD drawing (B1, B2, B3, etc.)",
-                40, 85, 750, 20, italic: true, color: System.Drawing.Color.DarkRed, fontSize: 8);
-            y += 130;
+            AddLabel(grpB, "Each Basement Height (m):", 345, 52, 195, 20);
+            numBasementHeight = AddNumericCtrl(grpB, 545, 50, 2.5M, 6.0M, 3.5M, decimals: 2, enabled: false);
+            AddLabel(grpB, "⚠️ One CAD tab will be created per basement floor (B1, B2, ...)",
+                35, 80, 840, 20, italic: true, color: System.Drawing.Color.DarkRed, fontSize: 8);
+            y += 118;
 
-            // Ground Floor
-            var grpGround = AddGroupBox(tab, "Ground Floor", 20, y, 820, 90);
-            chkGround = AddCheckBox(grpGround, "Include Ground Floor", 20, 25);
+            // Ground
+            var grpGr = AddGroupBox(tab, "Ground Floor", 20, y, 910, 82);
+            chkGround = AddCheckBox(grpGr, "Include Ground Floor", 15, 25);
             chkGround.CheckedChanged += ChkGround_CheckedChanged;
-            AddLabel(grpGround, "Ground Floor Height (m):", 40, 52);
-            numGroundHeight = AddNumeric(grpGround, 230, 50, 3.0M, 10.0M, 4.0M,
-                decimals: 2, enabled: false);
-            AddLabel(grpGround, "(Separate from E-Deck if both are used)",
-                320, 52, 480, 20, italic: true, color: System.Drawing.Color.Gray);
-            y += 100;
+            AddLabel(grpGr, "Ground Floor Height (m):", 35, 52, 180, 20);
+            numGroundHeight = AddNumericCtrl(grpGr, 220, 50, 3.0M, 10.0M, 4.0M, decimals: 2, enabled: false);
+            y += 92;
 
             // Podium
-            var grpPodium = AddGroupBox(tab, "Podium Floors", 20, y, 820, 90);
-            chkPodium = AddCheckBox(grpPodium, "Include Podium Floors", 20, 25);
+            var grpP = AddGroupBox(tab, "Podium Floors", 20, y, 910, 82);
+            chkPodium = AddCheckBox(grpP, "Include Podium Floors", 15, 25);
             chkPodium.CheckedChanged += ChkPodium_CheckedChanged;
-            AddLabel(grpPodium, "Number of Podiums:", 40, 52);
-            numPodiumLevels = AddNumeric(grpPodium, 200, 50, 1, 5, 1, enabled: false);
+            AddLabel(grpP, "Number of Podiums:", 35, 52, 150, 20);
+            numPodiumLevels = AddNumericCtrl(grpP, 190, 50, 1, 5, 1, enabled: false);
             numPodiumLevels.ValueChanged += NumPodiumLevels_ValueChanged;
-            AddLabel(grpPodium, "Podium Height (m):", 320, 52);
-            numPodiumHeight = AddNumeric(grpPodium, 480, 50, 3.0M, 8.0M, 4.5M,
-                decimals: 2, enabled: false);
-            y += 100;
+            AddLabel(grpP, "Podium Height (m):", 295, 52, 145, 20);
+            numPodiumHeight = AddNumericCtrl(grpP, 445, 50, 3.0M, 8.0M, 4.5M, decimals: 2, enabled: false);
+            y += 92;
 
             // E-Deck
-            var grpEDeck = AddGroupBox(tab, "E-Deck Floor", 20, y, 820, 90);
-            chkEDeck = AddCheckBox(grpEDeck, "Include E-Deck Floor", 20, 25);
+            var grpE = AddGroupBox(tab, "E-Deck Floor", 20, y, 910, 82);
+            chkEDeck = AddCheckBox(grpE, "Include E-Deck Floor", 15, 25);
             chkEDeck.CheckedChanged += ChkEDeck_CheckedChanged;
-            AddLabel(grpEDeck, "E-Deck Height (m):", 40, 52);
-            numEDeckHeight = AddNumeric(grpEDeck, 200, 50, 3.0M, 10.0M, 4.5M,
-                decimals: 2, enabled: false);
-            AddLabel(grpEDeck, "(Can be used separately or with Ground Floor)",
-                290, 52, 500, 20, italic: true, color: System.Drawing.Color.Gray);
-            y += 100;
+            AddLabel(grpE, "E-Deck Height (m):", 35, 52, 150, 20);
+            numEDeckHeight = AddNumericCtrl(grpE, 190, 50, 3.0M, 10.0M, 4.5M, decimals: 2, enabled: false);
+            y += 92;
 
             // Typical
-            var grpTypical = AddGroupBox(tab, "Typical Floors", 20, y, 820, 90);
-            chkTypical = AddCheckBox(grpTypical, "Include Typical Floors", 20, 25);
+            var grpT = AddGroupBox(tab, "Typical Floors", 20, y, 910, 82);
+            chkTypical = AddCheckBox(grpT, "Include Typical Floors", 15, 25);
             chkTypical.CheckedChanged += ChkTypical_CheckedChanged;
-            AddLabel(grpTypical, "Number of Typical Floors:", 40, 52);
-            numTypicalLevels = AddNumeric(grpTypical, 210, 50, 1, 100, 10, enabled: false);
+            AddLabel(grpT, "Number of Typical Floors:", 35, 52, 190, 20);
+            numTypicalLevels = AddNumericCtrl(grpT, 230, 50, 1, 100, 10, enabled: false);
             numTypicalLevels.ValueChanged += NumTypicalLevels_ValueChanged;
-            AddLabel(grpTypical, "Typical Floor Height (m):", 320, 52);
-            numTypicalHeight = AddNumeric(grpTypical, 490, 50, 2.8M, 5.0M, 3.0M,
-                decimals: 2, enabled: false);
-            y += 100;
+            AddLabel(grpT, "Typical Floor Height (m):", 335, 52, 190, 20);
+            numTypicalHeight = AddNumericCtrl(grpT, 530, 50, 2.8M, 5.0M, 3.0M, decimals: 2, enabled: false);
+            y += 92;
 
             // Terrace
-            var grpTerrace = AddGroupBox(tab, "Terrace Floor", 20, y, 820, 90);
-            chkTerrace = AddCheckBox(grpTerrace, "Include Terrace Floor", 20, 25);
+            var grpTr = AddGroupBox(tab, "Terrace Floor", 20, y, 910, 82);
+            chkTerrace = AddCheckBox(grpTr, "Include Terrace Floor", 15, 25);
             chkTerrace.CheckedChanged += ChkTerrace_CheckedChanged;
-            AddLabel(grpTerrace, "Terrace Height (m):", 40, 52);
-            numTerraceheight = AddNumeric(grpTerrace, 200, 50, 0M, 5.0M, 0M,
-                decimals: 2, enabled: false);
-            y += 100;
+            AddLabel(grpTr, "Terrace Height (m):", 35, 52, 150, 20);
+            numTerraceheight = AddNumericCtrl(grpTr, 190, 50, 0.0M, 5.0M, 0.0M, decimals: 2, enabled: false);
+            AddLabel(grpTr, "(0 = reference level only)", 285, 52, 580, 20,
+                italic: true, color: System.Drawing.Color.Gray);
+            y += 92;
 
-            // Seismic Zone
-            var grpSeismic = AddGroupBox(tab, "Seismic Parameters", 20, y, 820, 70);
-            AddLabel(grpSeismic, "Seismic Zone:", 40, 32, 120, 20);
-
+            // Seismic
+            var grpS = AddGroupBox(tab, "Seismic Parameters", 20, y, 910, 70);
+            AddLabel(grpS, "Seismic Zone:", 35, 32, 115, 20);
             cmbSeismicZone = new ComboBox
             {
-                Location = new System.Drawing.Point(170, 30),
-                Size = new System.Drawing.Size(150, 25),
+                Location = new System.Drawing.Point(155, 29),
+                Size = new System.Drawing.Size(260, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbSeismicZone.Items.AddRange(new object[] { "Zone II", "Zone III", "Zone IV", "Zone V" });
+            cmbSeismicZone.Items.AddRange(new object[]
+            {
+                "Zone II (Bangalore, Hyderabad)",
+                "Zone III",
+                "Zone IV (Ahmedabad & Kolkata)",
+                "Zone IV (NCR)",
+                "Zone V"
+            });
             cmbSeismicZone.SelectedIndex = 2;
-            grpSeismic.Controls.Add(cmbSeismicZone);
-
-            AddLabel(grpSeismic, "Affects gravity beam width: Zone II/III = 200mm, Zone IV/V = 240mm",
-                330, 32, 470, 20, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
+            grpS.Controls.Add(cmbSeismicZone);
+            AddLabel(grpS, "Zone II / III → gravity beam 200 mm   |   Zone IV / V → 240 mm",
+                425, 32, 470, 20, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
             y += 80;
 
-            // Generate Tabs Button
-            Button btnGen = new Button
+            var btnGen = new Button
             {
-                Text = "Generate CAD Import Tabs →",
-                Location = new System.Drawing.Point(320, y),
-                Size = new System.Drawing.Size(200, 40),
+                Text = "▶  Generate CAD Import Tabs",
+                Location = new System.Drawing.Point(340, y),
+                Size = new System.Drawing.Size(240, 42),
                 Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
                 BackColor = System.Drawing.Color.LightGreen
             };
@@ -872,38 +213,35 @@ namespace ETAB_Automation
             tab.AutoScroll = true;
             int y = 20;
 
-            // Header
-            AddLabel(tab, "🏗️ CONCRETE GRADE SCHEDULE - Define wall grades from bottom to top",
-                20, y, 800, 25, bold: true, color: System.Drawing.Color.DarkBlue, fontSize: 10);
+            AddLabel(tab, "🏗️ CONCRETE GRADE SCHEDULE — define wall grades from bottom to top",
+                20, y, 900, 25, bold: true, color: System.Drawing.Color.DarkBlue, fontSize: 10);
             y += 35;
 
-            // Note
-            AddLabel(tab, "⚠️ Total floors in grade schedule MUST equal total building floors\n" +
-                "Beam/Slab grades are auto-calculated as 0.7× wall grade (rounded to nearest 5)",
-                20, y, 800, 35, italic: true, color: System.Drawing.Color.DarkRed);
+            AddLabel(tab,
+                "⚠️ Total floors in schedule MUST equal total building floors.\n" +
+                "Beam/Slab grade = 0.7 × Wall grade (rounded to nearest 5, minimum M30).",
+                20, y, 900, 35, italic: true, color: System.Drawing.Color.DarkRed);
             y += 50;
 
-            // Total floors
             AddLabel(tab, "Total Building Floors:", 20, y, bold: true);
             numTotalFloors = new NumericUpDown
             {
-                Location = new System.Drawing.Point(180, y),
-                Size = new System.Drawing.Size(80, 25),
+                Location = new System.Drawing.Point(190, y),
+                Size = new System.Drawing.Size(85, 25),
                 ReadOnly = true,
                 Enabled = false,
                 Value = 0,
                 Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
             };
             tab.Controls.Add(numTotalFloors);
-            AddLabel(tab, "(Auto-calculated from Building Configuration tab)",
-                270, y + 2, italic: true, color: System.Drawing.Color.Gray);
+            AddLabel(tab, "(Auto-calculated from Building Config tab)",
+                285, y + 2, 440, 20, italic: true, color: System.Drawing.Color.Gray);
             y += 40;
 
-            // DataGrid
             dgvGradeSchedule = new DataGridView
             {
                 Location = new System.Drawing.Point(20, y),
-                Size = new System.Drawing.Size(820, 300),
+                Size = new System.Drawing.Size(900, 300),
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
@@ -912,60 +250,35 @@ namespace ETAB_Automation
             };
 
             dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "Index",
-                HeaderText = "Row",
-                ReadOnly = true,
-                Width = 60
-            });
-
+            { Name = "Index", HeaderText = "#", ReadOnly = true, Width = 40 });
             dgvGradeSchedule.Columns.Add(new DataGridViewComboBoxColumn
             {
                 Name = "WallGrade",
-                HeaderText = "Wall Concrete Grade from bottom",
+                HeaderText = "Wall Concrete Grade (bottom → top)",
                 DataSource = new List<string> { "M20", "M25", "M30", "M35", "M40", "M45", "M50", "M55", "M60" },
                 Width = 200
             });
-
             dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "FloorsCount",
-                HeaderText = "No. of floors Concrete Grade from bottom",
-                Width = 250
-            });
-
+            { Name = "FloorsCount", HeaderText = "No. of Floors", Width = 120 });
             dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "BeamSlabGrade",
-                HeaderText = "Beam/Slab Grade (Auto)",
-                ReadOnly = true,
-                Width = 150
-            });
-
+            { Name = "BeamSlabGrade", HeaderText = "Beam/Slab Grade (Auto)", ReadOnly = true, Width = 160 });
             dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "FloorRange",
-                HeaderText = "Floor Range",
-                ReadOnly = true,
-                Width = 150
-            });
+            { Name = "FloorRange", HeaderText = "Floor Range", ReadOnly = true, Width = 130 });
 
             dgvGradeSchedule.CellValueChanged += DgvGradeSchedule_CellValueChanged;
-            dgvGradeSchedule.CurrentCellDirtyStateChanged += (s, e) =>
+            dgvGradeSchedule.CurrentCellDirtyStateChanged += (s, ev) =>
             {
                 if (dgvGradeSchedule.IsCurrentCellDirty)
                     dgvGradeSchedule.CommitEdit(DataGridViewDataErrorContexts.Commit);
             };
-
             tab.Controls.Add(dgvGradeSchedule);
-            y += 310;
+            y += 315;
 
-            // Buttons
             btnAddGradeRow = new Button
             {
-                Text = "➕ Add Grade Row",
+                Text = "➕ Add Row",
                 Location = new System.Drawing.Point(20, y),
-                Size = new System.Drawing.Size(150, 35),
+                Size = new System.Drawing.Size(130, 35),
                 Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
             };
             btnAddGradeRow.Click += BtnAddGradeRow_Click;
@@ -973,9 +286,9 @@ namespace ETAB_Automation
 
             btnRemoveGradeRow = new Button
             {
-                Text = "➖ Remove Selected Row",
-                Location = new System.Drawing.Point(180, y),
-                Size = new System.Drawing.Size(170, 35)
+                Text = "➖ Remove Selected",
+                Location = new System.Drawing.Point(160, y),
+                Size = new System.Drawing.Size(160, 35)
             };
             btnRemoveGradeRow.Click += BtnRemoveGradeRow_Click;
             tab.Controls.Add(btnRemoveGradeRow);
@@ -983,8 +296,8 @@ namespace ETAB_Automation
             lblGradeTotal = new Label
             {
                 Text = "Total floors in schedule: 0 / 0",
-                Location = new System.Drawing.Point(370, y + 8),
-                Size = new System.Drawing.Size(400, 25),
+                Location = new System.Drawing.Point(335, y + 8),
+                Size = new System.Drawing.Size(550, 25),
                 Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
                 ForeColor = System.Drawing.Color.DarkRed
             };
@@ -994,274 +307,472 @@ namespace ETAB_Automation
         }
 
         // ====================================================================
-        // DYNAMIC CAD IMPORT TAB CREATION
+        // DYNAMIC CAD IMPORT TAB
         // ====================================================================
 
-        internal void CreateCADImportTab(string floorType, string description)
+        internal void CreateCADImportTab(string floorType, string description,
+            List<(string label, string dictKey)> namedGravityBeams = null)
         {
-            TabPage tab = new TabPage($"{floorType} - CAD Import");
+            var tab = new TabPage(floorType);
             tab.AutoScroll = true;
             tabControl.TabPages.Add(tab);
-
             int y = 10;
 
-            AddLabel(tab, $"📐 {description}", 20, y, 800, 25, bold: true,
-                color: System.Drawing.Color.DarkGreen);
+            AddLabel(tab, $"📐 {description}", 20, y, 900, 25,
+                bold: true, color: System.Drawing.Color.DarkGreen);
             y += 35;
 
-            // CAD File
-            AddLabel(tab, "CAD File:", 20, y);
-            TextBox txtCAD = new TextBox
+            // CAD File row
+            AddLabel(tab, "CAD File:", 20, y, 85, 25);
+            var txtCAD = new TextBox
             {
-                Location = new System.Drawing.Point(120, y - 2),
-                Size = new System.Drawing.Size(540, 25),
+                Location = new System.Drawing.Point(110, y - 2),
+                Size = new System.Drawing.Size(610, 25),
                 ReadOnly = true
             };
             tab.Controls.Add(txtCAD);
             cadPathTextBoxes[floorType] = txtCAD;
 
-            Button btnLoad = new Button
+            var btnLoad = new Button
             {
                 Text = "Browse...",
-                Location = new System.Drawing.Point(670, y - 4),
-                Size = new System.Drawing.Size(120, 28)
+                Location = new System.Drawing.Point(730, y - 4),
+                Size = new System.Drawing.Size(110, 28)
             };
             btnLoad.Click += (s, ev) => BtnLoadCAD_Click(floorType);
             tab.Controls.Add(btnLoad);
-            y += 40;
+            y += 42;
 
-            // Layer Mapping
+            // Resolve GPL defaults: numTypicalFloors from the UI, seismicZone from combo
+            int numFloors = chkTypical.Checked ? (int)numTypicalLevels.Value : 20;
+            string seisZone = cmbSeismicZone.SelectedItem?.ToString()
+                                ?? "Zone IV (Ahmedabad & Kolkata)";
+
             AddLayerMappingUI(tab, floorType, ref y);
-
-            // Beam Depths
-            AddBeamDepthsUI(tab, floorType, ref y);
-
-            // Slab Thicknesses
+            AddWallThicknessUI(tab, floorType, numFloors, seisZone, ref y);
+            AddBeamDepthsUI(tab, floorType, namedGravityBeams, ref y);
             AddSlabThicknessesUI(tab, floorType, ref y);
         }
 
+        // ====================================================================
+        // LAYER MAPPING UI
+        // ====================================================================
+
         private void AddLayerMappingUI(TabPage tab, string floorType, ref int y)
         {
-            AddLabel(tab, "Available CAD Layers:", 20, y);
+            AddLabel(tab, "Available CAD Layers:", 20, y, 200, 20);
 
-            ListBox lstAvail = new ListBox
-            {
-                Location = new System.Drawing.Point(20, y + 25),
-                Size = new System.Drawing.Size(280, 250)
-            };
+            var lstAvail = new ListBox
+            { Location = new System.Drawing.Point(20, y + 22), Size = new System.Drawing.Size(305, 215) };
             tab.Controls.Add(lstAvail);
             availableLayerListBoxes[floorType] = lstAvail;
 
-            AddLabel(tab, "Assign as:", 320, y + 25);
-
-            ComboBox cboElem = new ComboBox
+            // Centre column x = 340
+            AddLabel(tab, "Assign as:", 342, y + 22, 90, 20);
+            var cboElem = new ComboBox
             {
-                Location = new System.Drawing.Point(320, y + 50),
-                Size = new System.Drawing.Size(140, 25),
+                Location = new System.Drawing.Point(342, y + 44),
+                Size = new System.Drawing.Size(145, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cboElem.Items.AddRange(new object[] { "Beam", "Wall", "Slab", "Ignore" });
+            cboElem.Items.AddRange(new object[] { "Beam", "Wall", "Slab", "Column", "Ignore" });
             cboElem.SelectedIndex = 0;
             tab.Controls.Add(cboElem);
             elementTypeComboBoxes[floorType] = cboElem;
 
-            Button btnAdd = new Button
-            {
-                Text = "Add →",
-                Location = new System.Drawing.Point(320, y + 85),
-                Size = new System.Drawing.Size(140, 35)
-            };
+            var btnAdd = new Button
+            { Text = "Add  →", Location = new System.Drawing.Point(342, y + 78), Size = new System.Drawing.Size(145, 32) };
             btnAdd.Click += (s, ev) => BtnAddMapping_Click(floorType);
             tab.Controls.Add(btnAdd);
 
-            Button btnRem = new Button
-            {
-                Text = "← Remove",
-                Location = new System.Drawing.Point(320, y + 130),
-                Size = new System.Drawing.Size(140, 35)
-            };
+            var btnRem = new Button
+            { Text = "←  Remove", Location = new System.Drawing.Point(342, y + 120), Size = new System.Drawing.Size(145, 32) };
             btnRem.Click += (s, ev) => BtnRemoveMapping_Click(floorType);
             tab.Controls.Add(btnRem);
 
-            AddLabel(tab, "Layer Mappings:", 480, y);
-
-            ListBox lstMap = new ListBox
-            {
-                Location = new System.Drawing.Point(480, y + 25),
-                Size = new System.Drawing.Size(310, 250)
-            };
+            AddLabel(tab, "Layer Mappings:", 502, y, 200, 20);
+            var lstMap = new ListBox
+            { Location = new System.Drawing.Point(502, y + 22), Size = new System.Drawing.Size(338, 215) };
             tab.Controls.Add(lstMap);
             mappedLayerListBoxes[floorType] = lstMap;
 
-            y += 290;
+            y += 252;
         }
 
-        private void AddBeamDepthsUI(TabPage tab, string floorType, ref int y)
+        // ====================================================================
+        // WALL THICKNESS UI
+        // ====================================================================
+        // Shows GPL table values pre-filled in each spinner.
+        // User can edit — the edited value is used directly (no "0 = auto" logic).
+        // GPL values are read from WallThicknessCalculator.GetRecommendedThickness().
+        // ====================================================================
+
+        private void AddWallThicknessUI(TabPage tab, string floorType,
+            int numFloors, string seisZone, ref int y)
         {
-            var grp = AddGroupBox(tab, $"🔧 Beam Depths for {floorType} (mm)", 20, y, 820, 180);
+            // ── Resolve GPL defaults ────────────────────────────────────────
+            int gplCore = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.CoreWall, seisZone);
+            int gplPerDead = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralDeadWall, seisZone);
+            int gplPerPortal = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralPortalWall, seisZone);
+            int gplInternal = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.InternalWall, seisZone);
 
-            int gw = (cmbSeismicZone.SelectedItem?.ToString() == "Zone II" ||
-                     cmbSeismicZone.SelectedItem?.ToString() == "Zone III") ? 200 : 240;
+            // Group box: 4 rows
+            //   Row 1 header / note
+            //   Row 2: Core | Periph.Dead | Periph.Portal
+            //   Row 3: Internal Wall (full row, no NTA overlap)
+            //   Row 4: NTA panel (full-width highlighted row)
+            //   Row 5: footer note
+            const int grpH = 195;
+            var grp = AddGroupBox(tab,
+                "🧱 Wall Thicknesses — GPL Table (IS 1893-2025)  |  Values pre-filled from GPL; edit to override",
+                20, y, 920, grpH);
 
-            AddLabel(grp, $"Gravity Beam Width: {gw}mm (auto) | Main Beam Width: Matches wall",
-                15, 20, 790, 20, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
+            AddLabel(grp,
+                $"Values shown are from GPL table for {numFloors} floors / {seisZone}.  " +
+                "Edit any value to override for this floor type.",
+                15, 20, 890, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
-            // Column 1 - Gravity beams
-            var lblIntGrav = new Label
+            // ── ROW 1 (y=42): Core | Periph.Dead | Periph.Portal ──────────
+            const int ry1 = 42;
+            AddLabel(grp, "Core Wall (mm):", C1L, ry1, C1N - C1L - 5, 20);
+            numCoreWallOverridePerFloor[floorType] =
+                AddNumericCtrl(grp, C1N, ry1 - 2, 100, 700, gplCore, increment: 25);
+            AddLabel(grp, $"GPL: {gplCore}", C1N + NW + 4, ry1 + 2, 62, 16,
+                italic: true, color: System.Drawing.Color.DimGray, fontSize: 7.5f);
+
+            AddLabel(grp, "Periph. Dead Wall (mm):", C2L, ry1, C2N - C2L - 5, 20);
+            numPeriphDeadWallOverridePerFloor[floorType] =
+                AddNumericCtrl(grp, C2N, ry1 - 2, 100, 700, gplPerDead, increment: 25);
+            AddLabel(grp, $"GPL: {gplPerDead}", C2N + NW + 4, ry1 + 2, 62, 16,
+                italic: true, color: System.Drawing.Color.DimGray, fontSize: 7.5f);
+
+            AddLabel(grp, "Periph. Portal Wall (mm):", C3L, ry1, C3N - C3L - 5, 20);
+            numPeriphPortalWallOverridePerFloor[floorType] =
+                AddNumericCtrl(grp, C3N, ry1 - 2, 100, 700, gplPerPortal, increment: 25);
+            // no room for GPL label after C3N on right edge — use tooltip instead
+            toolTip.SetToolTip(numPeriphPortalWallOverridePerFloor[floorType],
+                $"GPL table value for {numFloors} floors: {gplPerPortal} mm");
+
+            // ── ROW 2 (y=80): Internal Wall — own full row, no NTA nearby ──
+            const int ry2 = 80;
+            AddLabel(grp, "Internal Wall (mm):", C1L, ry2, C1N - C1L - 5, 20);
+            numInternalWallOverridePerFloor[floorType] =
+                AddNumericCtrl(grp, C1N, ry2 - 2, 100, 700, gplInternal, increment: 25);
+            AddLabel(grp, $"GPL: {gplInternal}", C1N + NW + 4, ry2 + 2, 62, 16,
+                italic: true, color: System.Drawing.Color.DimGray, fontSize: 7.5f);
+
+            // helpful note beside internal wall
+            AddLabel(grp,
+                "(short wall < 1.8 m may require thicker — see GPL table for coupled shear wall cases)",
+                C2L, ry2 + 2, 480, 16,
+                italic: true, color: System.Drawing.Color.Gray, fontSize: 7.5f);
+
+            // ── ROW 3 (y=108): NTA highlighted panel — clear of internal row ─
+            const int ry3 = 110;
+            var ntaPanel = new System.Windows.Forms.Panel
             {
-                Text = "Internal Gravity:",
-                Location = new System.Drawing.Point(20, 50),
-                AutoSize = true
+                Location = new System.Drawing.Point(C1L, ry3),
+                Size = new System.Drawing.Size(880, 46),
+                BackColor = System.Drawing.Color.FromArgb(255, 255, 200),
+                BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle
             };
-            grp.Controls.Add(lblIntGrav);
-            numInternalGravityDepthPerFloor[floorType] =
-                AddNumeric(grp, 175, 48, 200, 1000, 450, increment: 25);
+            grp.Controls.Add(ntaPanel);
+            AddLabel(ntaPanel, "W-NTA Wall — Non-structural  (always user defined, mm):",
+                8, 5, 340, 20, bold: true, fontSize: 8.5f);
+            numNtaWallThicknessPerFloor[floorType] =
+                AddNumericCtrl(ntaPanel, 355, 4, 100, 500, 200, increment: 25);
+            AddLabel(ntaPanel,
+                "Not in GPL table — enter actual partition / non-structural wall thickness for this floor.",
+                8, 25, 855, 16, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
 
-            var lblCantGrav = new Label
-            {
-                Text = "Cantilever Gravity:",
-                Location = new System.Drawing.Point(20, 85),
-                AutoSize = true
-            };
-            grp.Controls.Add(lblCantGrav);
-            numCantileverGravityDepthPerFloor[floorType] =
-                AddNumeric(grp, 175, 83, 200, 1000, 500, increment: 25);
+            // ── Footer note ────────────────────────────────────────────────
+            AddLabel(grp,
+                "Wall pier labels in ETABS: P1, P2, P3 … (auto-assigned per wall element)",
+                C1L, 162, 880, 16, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
 
-            // Column 2 - Main beams (part 1)
-            var lblCoreMain = new Label
-            {
-                Text = "Core Main:",
-                Location = new System.Drawing.Point(300, 50),
-                AutoSize = true
-            };
-            grp.Controls.Add(lblCoreMain);
-            numCoreMainDepthPerFloor[floorType] =
-                AddNumeric(grp, 425, 48, 300, 1500, 600, increment: 25);
-
-            var lblPeriDead = new Label
-            {
-                Text = "Peripheral Dead:",
-                Location = new System.Drawing.Point(300, 85),
-                AutoSize = true
-            };
-            grp.Controls.Add(lblPeriDead);
-            numPeripheralDeadMainDepthPerFloor[floorType] =
-                AddNumeric(grp, 425, 83, 300, 1500, 600, increment: 25);
-
-            // Column 3 - Main beams (part 2)
-            var lblPeriPortal = new Label
-            {
-                Text = "Peripheral Portal:",
-                Location = new System.Drawing.Point(550, 50),
-                AutoSize = true
-            };
-            grp.Controls.Add(lblPeriPortal);
-            numPeripheralPortalMainDepthPerFloor[floorType] =
-                AddNumeric(grp, 675, 48, 300, 1500, 650, increment: 25);
-
-            var lblIntMain = new Label
-            {
-                Text = "Internal Main:",
-                Location = new System.Drawing.Point(550, 85),
-                AutoSize = true
-            };
-            grp.Controls.Add(lblIntMain);
-            numInternalMainDepthPerFloor[floorType] =
-                AddNumeric(grp, 675, 83, 300, 1500, 550, increment: 25);
-
-            AddLabel(grp, "💡 All depths in mm. Widths auto-set based on type and seismic zone.",
-                20, 130, 780, 35, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 8);
-
-            y += 190;
+            y += grpH + 8;
         }
+
+        /// <summary>
+        /// Safely calls GetRecommendedThickness; returns a sensible fallback on error.
+        /// </summary>
+        private static int SafeGetGPL(int floors,
+            Core.WallThicknessCalculator.WallType wallType, string seisZone)
+        {
+            try
+            {
+                int f = Math.Max(1, Math.Min(50, floors));
+                return Core.WallThicknessCalculator.GetRecommendedThickness(
+                    f, wallType, seisZone);
+            }
+            catch
+            {
+                // fallback if zone string not recognised yet
+                return wallType == Core.WallThicknessCalculator.WallType.CoreWall ? 300 : 200;
+            }
+        }
+
+        // ====================================================================
+        // BEAM DEPTHS UI — clean fixed-grid, no overlap
+        // ====================================================================
+
+        private void AddBeamDepthsUI(TabPage tab, string floorType,
+            List<(string label, string dictKey)> namedGravityBeams, ref int y)
+        {
+            int extraRows = namedGravityBeams?.Count ?? 0;
+            // Rows layout (each RH=32px):
+            //  header line      ~22
+            //  GRAVITY header   ~22
+            //  row: Internal | Cantilever | GravWidth     RH
+            //  row: No-Load gravity                       RH
+            //  extra named rows                           RH * n
+            //  note line        ~20
+            //  MAIN header      ~22
+            //  row: Core depth | Periph.Dead depth        RH
+            //  row: Core W ovr | Dead W ovr               RH
+            //  row: Portal depth | Portal W ovr           RH
+            //  row: Internal depth | Internal W ovr       RH
+            //  note line        ~28
+            //  bottom padding   ~10
+
+            int grpHeight = 26 + 24                  // header + gravity label
+                          + RH                        // internal/cantilever/width
+                          + RH                        // no-load
+                          + (RH * extraRows)          // named gravity
+                          + 22                        // note
+                          + 26                        // main header
+                          + RH + RH + RH + RH         // 4 main beam rows
+                          + 30                        // note
+                          + 10;                       // pad
+
+            var grp = AddGroupBox(tab,
+                "🔧 Beam Configuration — Depth (mm, user input) | Width (mm, auto or override)",
+                20, y, 920, grpHeight);
+
+            int gw = GetAutoGravityWidthFromUI();
+            AddLabel(grp,
+                $"Auto gravity width: {gw} mm (seismic zone)   |   Main beam (MB) width = matching wall thickness   |   Width override 0 = auto",
+                15, 20, 890, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
+
+            int gy = 46;   // current y inside groupbox
+
+            // ── GRAVITY BEAMS ─────────────────────────────────────────────
+            AddLabel(grp, "─── GRAVITY BEAMS ───", C1L, gy, 260, 18,
+                bold: true, fontSize: 8.5f);
+            gy += 24;
+
+            // Row 1: Internal Gravity | Cantilever Gravity | Gravity Width override
+            AddLabel(grp, "B-Internal Gravity Beams depth:", C1L, gy, C1N - C1L - 5, 20);
+            numInternalGravityDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 200, 1200, 450, increment: 25);
+
+            AddLabel(grp, "B-Cantilever Gravity Beams depth:", C2L, gy, C2N - C2L - 5, 20);
+            numCantileverGravityDepthPerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 200, 1200, 500, increment: 25);
+
+            AddLabel(grp, "Gravity Width override (0=auto):", C3L, gy, C3N - C3L - 5, 20);
+            numGravityWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C3N, gy - 2, 0, 500, 0, increment: 10);
+            gy += RH;
+
+            // Row 2: No Load Gravity
+            AddLabel(grp, "B-No Load Gravity Beams depth:", C1L, gy, C1N - C1L - 5, 20);
+            numNoLoadGravityDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 200, 1200, 450, increment: 25);
+            AddLabel(grp, "(Wall load = 0 kN/m; depth user input)", C2L, gy, 400, 18,
+                italic: true, color: System.Drawing.Color.Gray, fontSize: 7.5f);
+            gy += RH;
+
+            // Extra named gravity rows (context-sensitive per floor type)
+            if (namedGravityBeams != null)
+            {
+                foreach (var (beamLabel, dictKey) in namedGravityBeams)
+                {
+                    AddLabel(grp, $"{beamLabel} depth:", C1L, gy, C1N - C1L - 5, 20);
+                    var num = AddNumericCtrl(grp, C1N, gy - 2, 200, 1200, 450, increment: 25);
+
+                    switch (dictKey)
+                    {
+                        case "EDeck": numEDeckGravityDepthPerFloor[floorType] = num; break;
+                        case "Podium": numPodiumGravityDepthPerFloor[floorType] = num; break;
+                        case "Ground": numGroundGravityDepthPerFloor[floorType] = num; break;
+                        case "Basement": numBasementGravityDepthPerFloor[floorType] = num; break;
+                    }
+                    gy += RH;
+                }
+            }
+
+            // Note
+            AddLabel(grp,
+                "(Named gravity variants above use their own depth. Beam load assigned per CAD layer.)",
+                C1L, gy, 880, 16, italic: true, color: System.Drawing.Color.Gray, fontSize: 7.5f);
+            gy += 22;
+
+            // ── MAIN BEAMS ────────────────────────────────────────────────
+            AddLabel(grp, "─── MAIN BEAMS (MB__ sections) ───", C1L, gy, 320, 18,
+                bold: true, fontSize: 8.5f);
+            gy += 26;
+
+            // Row: Core Main depth | Core Main width override
+            AddLabel(grp, "B-Core Main Beams depth:", C1L, gy, C1N - C1L - 5, 20);
+            numCoreMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 600, increment: 25);
+
+            AddLabel(grp, "B-Core Main Beams width override:", C2L, gy, C2N - C2L - 5, 20);
+            numCoreMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
+            gy += RH;
+
+            // Row: Periph. Dead depth | Periph. Dead width override
+            AddLabel(grp, "B-Peripheral Dead Main depth:", C1L, gy, C1N - C1L - 5, 20);
+            numPeripheralDeadMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 600, increment: 25);
+
+            AddLabel(grp, "B-Peripheral Dead width override:", C2L, gy, C2N - C2L - 5, 20);
+            numPeripheralDeadMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
+            gy += RH;
+
+            // Row: Periph. Portal depth | Periph. Portal width override
+            AddLabel(grp, "B-Peripheral Portal Main depth:", C1L, gy, C1N - C1L - 5, 20);
+            numPeripheralPortalMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 650, increment: 25);
+
+            AddLabel(grp, "B-Peripheral Portal width override:", C2L, gy, C2N - C2L - 5, 20);
+            numPeripheralPortalMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
+            gy += RH;
+
+            // Row: Internal Main depth | Internal Main width override
+            AddLabel(grp, "B-Internal Main Beams depth:", C1L, gy, C1N - C1L - 5, 20);
+            numInternalMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 550, increment: 25);
+
+            AddLabel(grp, "B-Internal Main width override:", C2L, gy, C2N - C2L - 5, 20);
+            numInternalMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
+            gy += RH;
+
+            AddLabel(grp,
+                "💡 Width override = 0 → auto (wall thickness for MB; zone width for gravity). MB sections must start with 'MB' in ETABS template.",
+                C1L, gy, 890, 26, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
+
+            y += grpHeight + 12;
+        }
+
+        // ====================================================================
+        // SLAB THICKNESSES UI
+        // ====================================================================
 
         private void AddSlabThicknessesUI(TabPage tab, string floorType, ref int y)
         {
-            var grp = AddGroupBox(tab, $"🔧 Slab Thicknesses for {floorType} (mm)", 20, y, 820, 120);
+            var grp = AddGroupBox(tab,
+                "🔧 Slab Thicknesses — YELLOW layers (user input, mm) | CYAN = auto-span | WHITE = auto-area",
+                20, y, 920, 210);
 
-            AddLabel(grp, "Regular slabs auto-determined by area (14-70 m²). Configure special cases below:",
-                15, 20, 790, 20, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
+            AddLabel(grp,
+                "WHITE layers: auto from polygon area (14 → 70 m²  =  125 → 250 mm).\n" +
+                "CYAN layers:  auto from cantilever span (1.0 – 5.0 m  =  125 – 200 mm).\n" +
+                "YELLOW layers below: fixed user input (structural special-purpose slabs).",
+                15, 20, 880, 46, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
-            AddLabel(grp, "Lobby Slab:", 40, 50);
-            numLobbySlabThicknessPerFloor[floorType] =
-                AddNumeric(grp, 195, 48, 100, 300, 160, increment: 5);
+            // Four-column slab grid
+            // Label widths kept to 115px, numeric at label+118
+            const int s1l = 20, s1n = 140;
+            const int s2l = 250, s2n = 370;
+            const int s3l = 490, s3n = 610;
+            const int s4l = 730, s4n = 828;
+            const int sr = 32;   // slab row height
 
-            AddLabel(grp, "Stair Slab:", 320, 50);
-            numStairSlabThicknessPerFloor[floorType] =
-                AddNumeric(grp, 475, 48, 125, 250, 175, increment: 5);
+            int sy = 72;
 
-            AddLabel(grp, "💡 Cantilever slabs use span-based rules (1.0-5.0m → 125-200mm)",
-                40, 85, 750, 20, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 8);
+            // Row 1
+            AddLabel(grp, "S-LOBBY:", s1l, sy, 115, 20);
+            numLobbySlabThicknessPerFloor[floorType] = AddNumericCtrl(grp, s1n, sy - 2, 100, 400, 160, increment: 5);
 
-            y += 130;
+            AddLabel(grp, "S-STAIRCASE:", s2l, sy, 115, 20);
+            numStairSlabThicknessPerFloor[floorType] = AddNumericCtrl(grp, s2n, sy - 2, 100, 400, 175, increment: 5);
+
+            AddLabel(grp, "S-FIRE TENDER:", s3l, sy, 115, 20);
+            numFireTenderSlabPerFloor[floorType] = AddNumericCtrl(grp, s3n, sy - 2, 100, 500, 200, increment: 5);
+
+            AddLabel(grp, "S-OHT:", s4l, sy, 90, 20);
+            numOHTSlabPerFloor[floorType] = AddNumericCtrl(grp, s4n, sy - 2, 100, 600, 200, increment: 5);
+            sy += sr;
+
+            // Row 2
+            AddLabel(grp, "S-TERRACE FIRE:", s1l, sy, 115, 20);
+            numTerraceFireSlabPerFloor[floorType] = AddNumericCtrl(grp, s1n, sy - 2, 100, 600, 200, increment: 5);
+
+            AddLabel(grp, "S-UGT:", s2l, sy, 115, 20);
+            numUGTSlabPerFloor[floorType] = AddNumericCtrl(grp, s2n, sy - 2, 100, 600, 250, increment: 5);
+
+            AddLabel(grp, "S-LANDSCAPE:", s3l, sy, 115, 20);
+            numLandscapeSlabPerFloor[floorType] = AddNumericCtrl(grp, s3n, sy - 2, 100, 500, 175, increment: 5);
+
+            AddLabel(grp, "S-SWIMMING:", s4l, sy, 90, 20);
+            numSwimmingSlabPerFloor[floorType] = AddNumericCtrl(grp, s4n, sy - 2, 100, 500, 250, increment: 5);
+            sy += sr;
+
+            // Row 3
+            AddLabel(grp, "S-DG:", s1l, sy, 115, 20);
+            numDGSlabPerFloor[floorType] = AddNumericCtrl(grp, s1n, sy - 2, 100, 500, 200, increment: 5);
+
+            AddLabel(grp, "S-STP:", s2l, sy, 115, 20);
+            numSTPSlabPerFloor[floorType] = AddNumericCtrl(grp, s2n, sy - 2, 100, 500, 200, increment: 5);
+            sy += sr;
+
+            AddLabel(grp,
+                "All slabs will be auto-meshed and assigned in ETABS after import.",
+                15, sy + 2, 880, 18, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
+
+            y += 222;
         }
+
+        // ====================================================================
+        // GENERATE TABS
+        // ====================================================================
 
         private void BtnGenerateTabs_Click(object sender, EventArgs e)
         {
-            // Validate at least one floor type is selected
             if (!chkBasement.Checked && !chkPodium.Checked && !chkGround.Checked &&
                 !chkEDeck.Checked && !chkTypical.Checked && !chkTerrace.Checked)
             {
-                MessageBox.Show(
-                    "Please select at least one floor type before generating tabs!",
-                    "No Floors Selected",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                MessageBox.Show("Please select at least one floor type!", "No Floors Selected",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Remove old tabs
             while (tabControl.TabPages.Count > 2)
                 tabControl.TabPages.RemoveAt(2);
 
-            // Clear dictionaries
-            cadPathTextBoxes.Clear();
-            availableLayerListBoxes.Clear();
-            mappedLayerListBoxes.Clear();
-            elementTypeComboBoxes.Clear();
-            numInternalGravityDepthPerFloor.Clear();
-            numCantileverGravityDepthPerFloor.Clear();
-            numCoreMainDepthPerFloor.Clear();
-            numPeripheralDeadMainDepthPerFloor.Clear();
-            numPeripheralPortalMainDepthPerFloor.Clear();
-            numInternalMainDepthPerFloor.Clear();
-            numLobbySlabThicknessPerFloor.Clear();
-            numStairSlabThicknessPerFloor.Clear();
+            ClearAllFloorDicts();
 
             int tabCount = 0;
 
-            // Generate tabs for individual basement floors
             if (chkBasement.Checked)
             {
-                int basementCount = (int)numBasementLevels.Value;
-                for (int i = 1; i <= basementCount; i++)
+                int cnt = (int)numBasementLevels.Value;
+                for (int i = 1; i <= cnt; i++)
                 {
-                    CreateCADImportTab($"Basement{i}", $"Basement {i} Floor Plan");
+                    CreateCADImportTab($"Basement{i}", $"Basement {i} Floor Plan",
+                        new List<(string, string)> { ($"B-Basement{i} Gravity Beams", "Basement") });
                     tabCount++;
                 }
             }
 
             if (chkPodium.Checked)
             {
-                CreateCADImportTab("Podium", "Podium Floor Plan");
+                CreateCADImportTab("Podium", "Podium Floor Plan",
+                    new List<(string, string)> { ("B-Podium Gravity Beams", "Podium") });
                 tabCount++;
             }
 
             if (chkGround.Checked)
             {
-                CreateCADImportTab("Ground", "Ground Floor Plan");
+                CreateCADImportTab("Ground", "Ground Floor Plan",
+                    new List<(string, string)> { ("B-Ground Gravity Beams", "Ground") });
                 tabCount++;
             }
 
             if (chkEDeck.Checked)
             {
-                CreateCADImportTab("EDeck", "E-Deck Floor Plan");
+                CreateCADImportTab("EDeck", "E-Deck Floor Plan",
+                    new List<(string, string)> { ("B-Edeck Gravity Beams", "EDeck") });
                 tabCount++;
             }
 
             if (chkTypical.Checked)
             {
-                CreateCADImportTab("Typical", "Typical Floor Plan (Will be replicated)");
+                CreateCADImportTab("Typical", "Typical Floor Plan (replicated for all typical floors)");
                 tabCount++;
             }
 
@@ -1273,26 +784,81 @@ namespace ETAB_Automation
 
             UpdateTotalFloorsForGradeSchedule();
 
-            string basementNote = chkBasement.Checked
-                ? $"\n• {(int)numBasementLevels.Value} individual basement floor tabs created (B1, B2, etc.)"
+            string bNote = chkBasement.Checked
+                ? $"\n• {(int)numBasementLevels.Value} individual basement tab(s) created (B1, B2 ...)"
                 : "";
 
             MessageBox.Show(
-                $"✓ {tabCount} CAD Import tab(s) generated!\n" +
-                basementNote + "\n\n" +
-                "Each floor type has its own beam and slab configuration.\n\n" +
-                "Please:\n" +
-                "1. Upload CAD files and map layers for each floor\n" +
-                "2. Configure beam depths and slab thicknesses\n" +
-                "3. Complete Concrete Grades schedule",
-                "Tabs Generated",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+                $"✓ {tabCount} CAD Import tab(s) generated!{bNote}\n\n" +
+                "Wall thicknesses are pre-filled from the GPL table (IS 1893-2025).\n" +
+                "Edit any value to override for that specific floor type.\n\n" +
+                "For each floor tab:\n" +
+                "  1. Browse & load DXF file\n" +
+                "  2. Verify auto-mapped layers, add / remove as needed\n" +
+                "  3. Check / adjust wall thicknesses (GPL values pre-filled)\n" +
+                "  4. Set all gravity & main beam depths; adjust width overrides if needed\n" +
+                "  5. Set YELLOW slab thicknesses\n\n" +
+                "Then complete the Concrete Grades schedule.",
+                "Tabs Generated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // ====================================================================
+        // CLEAR ALL FLOOR DICTS
+        // ====================================================================
+
+        private void ClearAllFloorDicts()
+        {
+            cadPathTextBoxes.Clear();
+            availableLayerListBoxes.Clear();
+            mappedLayerListBoxes.Clear();
+            elementTypeComboBoxes.Clear();
+
+            numInternalGravityDepthPerFloor.Clear();
+            numCantileverGravityDepthPerFloor.Clear();
+            numNoLoadGravityDepthPerFloor.Clear();
+            numEDeckGravityDepthPerFloor.Clear();
+            numPodiumGravityDepthPerFloor.Clear();
+            numGroundGravityDepthPerFloor.Clear();
+            numBasementGravityDepthPerFloor.Clear();
+
+            numCoreMainDepthPerFloor.Clear();
+            numPeripheralDeadMainDepthPerFloor.Clear();
+            numPeripheralPortalMainDepthPerFloor.Clear();
+            numInternalMainDepthPerFloor.Clear();
+
+            numGravityWidthOverridePerFloor.Clear();
+            numCoreMainWidthOverridePerFloor.Clear();
+            numPeripheralDeadMainWidthOverridePerFloor.Clear();
+            numPeripheralPortalMainWidthOverridePerFloor.Clear();
+            numInternalMainWidthOverridePerFloor.Clear();
+
+            numLobbySlabThicknessPerFloor.Clear();
+            numStairSlabThicknessPerFloor.Clear();
+            numFireTenderSlabPerFloor.Clear();
+            numOHTSlabPerFloor.Clear();
+            numTerraceFireSlabPerFloor.Clear();
+            numUGTSlabPerFloor.Clear();
+            numLandscapeSlabPerFloor.Clear();
+            numSwimmingSlabPerFloor.Clear();
+            numDGSlabPerFloor.Clear();
+            numSTPSlabPerFloor.Clear();
+
+            numCoreWallOverridePerFloor.Clear();
+            numPeriphDeadWallOverridePerFloor.Clear();
+            numPeriphPortalWallOverridePerFloor.Clear();
+            numInternalWallOverridePerFloor.Clear();
+            numNtaWallThicknessPerFloor.Clear();
         }
 
         // ====================================================================
         // UI HELPER METHODS
         // ====================================================================
+
+        private int GetAutoGravityWidthFromUI()
+        {
+            string zone = cmbSeismicZone.SelectedItem?.ToString() ?? "";
+            return (zone.Contains("II") || zone.Contains("III")) ? 200 : 240;
+        }
 
         private Label AddLabel(Control parent, string text, int x, int y,
             int width = 150, int height = 20, bool bold = false, bool italic = false,
@@ -1301,7 +867,6 @@ namespace ETAB_Automation
             var style = System.Drawing.FontStyle.Regular;
             if (bold) style |= System.Drawing.FontStyle.Bold;
             if (italic) style |= System.Drawing.FontStyle.Italic;
-
             var lbl = new Label
             {
                 Text = text,
@@ -1309,16 +874,12 @@ namespace ETAB_Automation
                 Size = new System.Drawing.Size(width, height),
                 Font = new System.Drawing.Font("Segoe UI", fontSize, style)
             };
-
-            if (color.HasValue)
-                lbl.ForeColor = color.Value;
-
+            if (color.HasValue) lbl.ForeColor = color.Value;
             parent.Controls.Add(lbl);
             return lbl;
         }
 
-        private GroupBox AddGroupBox(Control parent, string text, int x, int y,
-            int width, int height)
+        private GroupBox AddGroupBox(Control parent, string text, int x, int y, int width, int height)
         {
             var grp = new GroupBox
             {
@@ -1336,23 +897,26 @@ namespace ETAB_Automation
             {
                 Text = text,
                 Location = new System.Drawing.Point(x, y),
-                Size = new System.Drawing.Size(250, 20)
+                Size = new System.Drawing.Size(320, 20)
             };
             parent.Controls.Add(chk);
             return chk;
         }
 
-        private NumericUpDown AddNumeric(Control parent, int x, int y,
-            decimal min, decimal max, decimal value, int decimals = 0,
-            decimal increment = 1, bool enabled = true)
+        /// <summary>
+        /// Renamed from AddNumeric to AddNumericCtrl to avoid any ambiguity with overloads.
+        /// </summary>
+        private NumericUpDown AddNumericCtrl(Control parent, int x, int y,
+            decimal min, decimal max, decimal value,
+            int decimals = 0, decimal increment = 1, bool enabled = true)
         {
             var num = new NumericUpDown
             {
                 Location = new System.Drawing.Point(x, y),
-                Size = new System.Drawing.Size(80, 25),
+                Size = new System.Drawing.Size(NW, NH),
                 Minimum = min,
                 Maximum = max,
-                Value = value,
+                Value = Math.Max(min, Math.Min(max, value)),
                 DecimalPlaces = decimals,
                 Increment = increment,
                 Enabled = enabled
@@ -1362,7 +926,6 @@ namespace ETAB_Automation
         }
     }
 }
-
 // ============================================================================
 // END OF PART 2
 // ============================================================================
