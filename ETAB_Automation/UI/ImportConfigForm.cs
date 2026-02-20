@@ -3,7 +3,7 @@
 // FILE: UI/ImportConfigForm.cs (PART 1 - Main Form)
 // ============================================================================
 // PURPOSE: Main configuration form class with core logic
-// VERSION: 2.4 — Named gravity beam depths per floor tab; overlap-free UI
+// VERSION: 2.5 — Individual Podium tabs (like Basements) + Refuge floor support
 // ============================================================================
 
 using ETAB_Automation.Importers;
@@ -43,11 +43,13 @@ namespace ETAB_Automation
         internal CheckBox chkTypical;
         internal CheckBox chkTerrace;
         internal CheckBox chkFoundation;
+        internal CheckBox chkRefuge;   // NEW
+
         internal NumericUpDown numBasementLevels;
         internal NumericUpDown numPodiumLevels;
         internal NumericUpDown numTypicalLevels;
         internal NumericUpDown numBasementHeight;
-        internal NumericUpDown numPodiumHeight;
+        internal NumericUpDown numPodiumHeight;   // kept for backward compat (shared height)
         internal NumericUpDown numGroundHeight;
         internal NumericUpDown numEDeckHeight;
         internal NumericUpDown numTypicalHeight;
@@ -69,10 +71,8 @@ namespace ETAB_Automation
         internal Dictionary<string, ComboBox> elementTypeComboBoxes;
 
         // ── Per-floor GRAVITY beam depths ────────────────────────────────
-        // Standard gravity types (present on every tab)
         internal Dictionary<string, NumericUpDown> numInternalGravityDepthPerFloor;
         internal Dictionary<string, NumericUpDown> numCantileverGravityDepthPerFloor;
-        // Named gravity variants — only shown when relevant floor type is included
         internal Dictionary<string, NumericUpDown> numNoLoadGravityDepthPerFloor;
         internal Dictionary<string, NumericUpDown> numEDeckGravityDepthPerFloor;
         internal Dictionary<string, NumericUpDown> numPodiumGravityDepthPerFloor;
@@ -363,6 +363,8 @@ namespace ETAB_Automation
             if (chkEDeck.Checked) total += 1;
             if (chkTypical.Checked) total += (int)numTypicalLevels.Value;
             if (chkTerrace.Checked) total += 1;
+            // Refuge floors are carved out of the existing counts — they do NOT
+            // add to the total floor count.  The total is already correct.
             numTotalFloors.Value = total;
             UpdateGradeTotals();
         }
@@ -377,7 +379,8 @@ namespace ETAB_Automation
             numBasementHeight.Enabled = chkBasement.Checked;
             UpdateTotalFloorsForGradeSchedule();
         }
-        private void NumBasementLevels_ValueChanged(object sender, EventArgs e) => UpdateTotalFloorsForGradeSchedule();
+        private void NumBasementLevels_ValueChanged(object sender, EventArgs e) =>
+            UpdateTotalFloorsForGradeSchedule();
 
         private void ChkPodium_CheckedChanged(object sender, EventArgs e)
         {
@@ -385,7 +388,8 @@ namespace ETAB_Automation
             numPodiumHeight.Enabled = chkPodium.Checked;
             UpdateTotalFloorsForGradeSchedule();
         }
-        private void NumPodiumLevels_ValueChanged(object sender, EventArgs e) => UpdateTotalFloorsForGradeSchedule();
+        private void NumPodiumLevels_ValueChanged(object sender, EventArgs e) =>
+            UpdateTotalFloorsForGradeSchedule();
 
         private void ChkGround_CheckedChanged(object sender, EventArgs e)
         {
@@ -405,7 +409,8 @@ namespace ETAB_Automation
             numTypicalHeight.Enabled = chkTypical.Checked;
             UpdateTotalFloorsForGradeSchedule();
         }
-        private void NumTypicalLevels_ValueChanged(object sender, EventArgs e) => UpdateTotalFloorsForGradeSchedule();
+        private void NumTypicalLevels_ValueChanged(object sender, EventArgs e) =>
+            UpdateTotalFloorsForGradeSchedule();
 
         private void ChkTerrace_CheckedChanged(object sender, EventArgs e)
         {
@@ -485,34 +490,135 @@ namespace ETAB_Automation
             return true;
         }
 
+        // ====================================================================
+        // COLLECT FLOOR CONFIGS
+        // ====================================================================
+        // Building sequence (bottom → top):
+        //   Basements (individual) → Podiums (individual) → Ground → EDeck
+        //   → Typical/Refuge interleaved → Terrace (always last)
+        //
+        // Refuge is inserted at every absolute position that is a multiple of 5.
+        // Terrace is always pinned as the final floor and is exempt from the
+        // refuge pattern regardless of whether that position is a multiple of 5.
+        // ====================================================================
+
         private bool CollectFloorConfigs()
         {
             FloorConfigs.Clear();
+
+            // ── Step 1: Build the ordered sequence of floor type names ──────
+            // This represents every floor slot from bottom to top (excluding
+            // Terrace which is appended last).
+            var sequence = new List<string>();
 
             if (chkBasement.Checked)
             {
                 int cnt = (int)numBasementLevels.Value;
                 for (int i = 1; i <= cnt; i++)
-                    if (!AddFloorConfig($"Basement{i}", 1, (double)numBasementHeight.Value))
-                        return false;
+                    sequence.Add($"Basement{i}");
             }
+
             if (chkPodium.Checked)
-                if (!AddFloorConfig("Podium", (int)numPodiumLevels.Value, (double)numPodiumHeight.Value))
-                    return false;
-            if (chkGround.Checked)
-                if (!AddFloorConfig("Ground", 1, (double)numGroundHeight.Value))
-                    return false;
-            if (chkEDeck.Checked)
-                if (!AddFloorConfig("EDeck", 1, (double)numEDeckHeight.Value))
-                    return false;
+            {
+                int cnt = (int)numPodiumLevels.Value;
+                for (int i = 1; i <= cnt; i++)
+                    sequence.Add($"Podium{i}");
+            }
+
+            if (chkGround.Checked) sequence.Add("Ground");
+            if (chkEDeck.Checked) sequence.Add("EDeck");
+
+            // Typical floors — will be replaced by Refuge at multiples-of-5
             if (chkTypical.Checked)
-                if (!AddFloorConfig("Typical", (int)numTypicalLevels.Value, (double)numTypicalHeight.Value))
+            {
+                int cnt = (int)numTypicalLevels.Value;
+                for (int i = 0; i < cnt; i++)
+                    sequence.Add("Typical");
+            }
+
+            // ── Step 2: Replace multiples-of-5 with Refuge ──────────────────
+            // Position index is 1-based (position 1 = first slot in sequence).
+            // Terrace (position = sequence.Count + 1) is always exempt.
+            bool hasRefuge = chkRefuge.Checked;
+
+            if (hasRefuge)
+            {
+                for (int i = 0; i < sequence.Count; i++)
+                {
+                    int absolutePos = i + 1;  // 1-based
+                    if (absolutePos % 5 == 0)
+                        sequence[i] = "Refuge";
+                }
+            }
+
+            // ── Step 3: Terrace always last ───────────────────────────────
+            if (chkTerrace.Checked) sequence.Add("Terrace");
+
+            // ── Step 4: Validate CAD configs exist for all required types ──
+            var requiredTypes = new HashSet<string>(sequence);
+            foreach (string ft in requiredTypes)
+            {
+                if (!ValidateFloorConfig(ft))
+                {
+                    MessageBox.Show($"Please configure CAD file and layer mappings for: {ft}",
+                        "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
-            if (chkTerrace.Checked)
-                if (!AddFloorConfig("Terrace", 1, (double)numTerraceheight.Value))
-                    return false;
+                }
+            }
+
+            // ── Step 5: Collapse consecutive same-type floors into one config
+            // For shared types (Typical, Refuge, Ground, EDeck, Terrace) we group
+            // consecutive runs into one FloorTypeConfig with Count > 1.
+            // For individual types (BasementN, PodiumN) every slot is Count=1.
+            // ────────────────────────────────────────────────────────────────
+            // Individual types (always Count=1, no collapsing)
+            var individualTypes = new HashSet<string>();
+            if (chkBasement.Checked)
+                for (int i = 1; i <= (int)numBasementLevels.Value; i++)
+                    individualTypes.Add($"Basement{i}");
+            if (chkPodium.Checked)
+                for (int i = 1; i <= (int)numPodiumLevels.Value; i++)
+                    individualTypes.Add($"Podium{i}");
+
+            int idx2 = 0;
+            while (idx2 < sequence.Count)
+            {
+                string ft = sequence[idx2];
+
+                if (individualTypes.Contains(ft))
+                {
+                    // Individual — one config per slot
+                    double h = GetHeightForFloorType(ft);
+                    if (!AddFloorConfig(ft, 1, h)) return false;
+                    idx2++;
+                }
+                else
+                {
+                    // Shared type — count consecutive run
+                    int run = 1;
+                    while (idx2 + run < sequence.Count && sequence[idx2 + run] == ft)
+                        run++;
+
+                    double h = GetHeightForFloorType(ft);
+                    if (!AddFloorConfig(ft, run, h)) return false;
+                    idx2 += run;
+                }
+            }
 
             return true;
+        }
+
+        /// <summary>Returns the height (m) for a given floor type key.</summary>
+        private double GetHeightForFloorType(string ft)
+        {
+            if (ft.StartsWith("Basement")) return (double)numBasementHeight.Value;
+            if (ft.StartsWith("Podium")) return (double)numPodiumHeight.Value;
+            if (ft == "Ground") return (double)numGroundHeight.Value;
+            if (ft == "EDeck") return (double)numEDeckHeight.Value;
+            if (ft == "Typical") return (double)numTypicalHeight.Value;
+            if (ft == "Refuge") return (double)numTypicalHeight.Value;  // same height as typical
+            if (ft == "Terrace") return (double)numTerraceheight.Value;
+            return 3.0;  // fallback
         }
 
         private bool AddFloorConfig(string name, int count, double height)
@@ -523,6 +629,7 @@ namespace ETAB_Automation
                 return false;
             }
 
+            // Determine if individual basement
             bool isBasement = false;
             int bNum = 0;
             if (name.StartsWith("Basement") && name.Length > 8)
@@ -550,9 +657,6 @@ namespace ETAB_Automation
         // DATA COLLECTION HELPERS
         // ====================================================================
 
-        /// <summary>
-        /// Returns beam depth for named key; falls back to InternalGravity if dict not populated.
-        /// </summary>
         private int SafeGetDepth(Dictionary<string, NumericUpDown> dict, string ft, int fallback)
             => dict.ContainsKey(ft) ? (int)dict[ft].Value : fallback;
 
@@ -639,55 +743,46 @@ namespace ETAB_Automation
         // CONFIRMATION DIALOG
         // ====================================================================
 
+
         private void ShowConfirmation()
         {
             int totalStories = FloorConfigs.Sum(c => c.Count);
             double totalHeight = FloorConfigs.Sum(c => c.Height * c.Count);
-
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine("CONFIRM IMPORT");
-            sb.AppendLine("═══════════════════════════════════════\n");
-            sb.AppendLine($"Building: {totalStories} floors, {totalHeight:F2}m, {SeismicZone}");
-            if (chkFoundation.Checked) sb.AppendLine($"Foundation Height: {FoundationHeight:F2}m");
-            sb.AppendLine($"Types: {string.Join(", ", FloorConfigs.Select(c => $"{c.Name}({c.Count})"))}");
 
-            sb.AppendLine("\nFLOOR CONFIGS:");
+            sb.AppendLine($"{totalStories}F | {totalHeight:F2}m | {SeismicZone}" +
+                          (chkFoundation.Checked ? $" | Fdn: {FoundationHeight:F2}m" : ""));
+            sb.AppendLine($"Types: {string.Join(", ", FloorConfigs.Select(c => $"{c.Name}×{c.Count}"))}");
+
+            if (chkRefuge.Checked)
+            {
+                int p = 0;
+                sb.AppendLine($"Refuge @ {string.Join(", ", FloorConfigs.SelectMany(c =>
+                    Enumerable.Range(0, c.Count).Select(_ => (pos: ++p, refuge: c.Name == "Refuge")))
+                    .Where(x => x.refuge).Select(x => x.pos))}");
+            }
+
+            sb.AppendLine("\nFLOORS:");
             foreach (var cfg in FloorConfigs)
             {
-                int gw = GetAutoGravityWidth();
-                int gwOverride = cfg.BeamWidthOverrides.GetValueOrDefault("GravityWidth", 0);
-                int effGW = gwOverride > 0 ? gwOverride : gw;
-
-                sb.AppendLine($"\n{cfg.Name}:");
-                sb.AppendLine($"  Gravity: {effGW}×{cfg.BeamDepths["InternalGravity"]}  " +
-                              $"Cantilever: {effGW}×{cfg.BeamDepths["CantileverGravity"]}");
-                sb.AppendLine($"  Core MB: {cfg.BeamDepths["CoreMain"]}  NTA wall: {cfg.NtaWallThickness}mm");
-                sb.AppendLine($"  Slabs: Lobby {cfg.SlabThicknesses["Lobby"]}, " +
-                              $"Stair {cfg.SlabThicknesses["Stair"]}, " +
-                              $"UGT {cfg.SlabThicknesses["UGT"]}, " +
-                              $"Swimming {cfg.SlabThicknesses["Swimming"]}mm");
+                int gw = cfg.BeamWidthOverrides.GetValueOrDefault("GravityWidth", 0) is > 0 and int ov ? ov : GetAutoGravityWidth();
+                sb.AppendLine($"  {cfg.Name}: G={gw}×{cfg.BeamDepths["InternalGravity"]} C={gw}×{cfg.BeamDepths["CantileverGravity"]} " +
+                              $"MB={cfg.BeamDepths["CoreMain"]} NTA={cfg.NtaWallThickness} " +
+                              $"Slabs={cfg.SlabThicknesses["Lobby"]}/{cfg.SlabThicknesses["Stair"]}/{cfg.SlabThicknesses["UGT"]}/{cfg.SlabThicknesses["Swimming"]}mm");
             }
 
             sb.AppendLine("\nGRADES:");
-            int floorStart = 1;
+            int f = 1;
             for (int i = 0; i < WallGrades.Count; i++)
             {
-                string bsg = CalculateBeamSlabGrade(WallGrades[i]);
-                int floorEnd = floorStart + FloorsPerGrade[i] - 1;
-                sb.AppendLine($"  F{floorStart}-{floorEnd}: {WallGrades[i]}/{bsg}");
-                floorStart = floorEnd + 1;
+                int end = f + FloorsPerGrade[i] - 1;
+                sb.AppendLine($"  F{f}-{end}: {WallGrades[i]}/{CalculateBeamSlabGrade(WallGrades[i])}");
+                f = end + 1;
             }
 
-            sb.AppendLine("\n═══════════════════════════════════════");
-            sb.AppendLine("Ready to import?");
-
-            var result = MessageBox.Show(sb.ToString(), "Confirm Import",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
+            if (MessageBox.Show(sb.ToString(), "Confirm Import", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             { this.DialogResult = DialogResult.OK; this.Close(); }
         }
-
         private int GetAutoGravityWidth()
         {
             string zone = cmbSeismicZone.SelectedItem?.ToString() ?? "";

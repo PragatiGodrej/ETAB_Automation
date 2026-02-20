@@ -3,7 +3,7 @@
 // FILE: UI/ImportConfigFormUI.cs (PART 2 - UI Initialization)
 // ============================================================================
 // PURPOSE: UI initialization and tab creation for ImportConfigForm
-// VERSION: 2.5 — Clean fixed-grid layout, no overlaps
+// VERSION: 2.6 — Individual Podium tabs (like Basements) + Refuge floor tab
 // ============================================================================
 
 using System;
@@ -19,21 +19,12 @@ namespace ETAB_Automation
         // ====================================================================
         // LAYOUT CONSTANTS
         // ====================================================================
-        // Three-column grid used throughout beam / wall / slab sections:
-        //
-        //  Col 1:  label @  20  | numeric @ 210   (label width 185)
-        //  Col 2:  label @ 320  | numeric @ 510   (label width 185)
-        //  Col 3:  label @ 620  | numeric @ 800   (label width 175)
-        //
-        // NumericUpDown width: 85  Height: 25
-        // Row height: 32
-
         private const int C1L = 20, C1N = 210;
         private const int C2L = 320, C2N = 510;
         private const int C3L = 620, C3N = 800;
-        private const int NW = 85;   // numeric width
-        private const int NH = 25;   // numeric height
-        private const int RH = 32;   // row height
+        private const int NW = 85;
+        private const int NH = 25;
+        private const int RH = 32;
 
         // ====================================================================
         // MAIN UI INITIALIZATION
@@ -46,7 +37,7 @@ namespace ETAB_Automation
 
             this.Size = new System.Drawing.Size(980, 840);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Text = "ETABS CAD Import Configuration v2.5";
+            this.Text = "ETABS CAD Import Configuration v2.6";
 
             tabControl = new TabControl
             {
@@ -109,7 +100,7 @@ namespace ETAB_Automation
             y += 95;
 
             // Basement
-            var grpB = AddGroupBox(tab, "Basement Floors  (each floor requires its own CAD plan)", 20, y, 910, 108);
+            var grpB = AddGroupBox(tab, "Basement Floors  (each floor gets its own CAD tab)", 20, y, 910, 108);
             chkBasement = AddCheckBox(grpB, "Include Basement Floors", 15, 25);
             chkBasement.CheckedChanged += ChkBasement_CheckedChanged;
             AddLabel(grpB, "Number of Basements (1–5):", 35, 52, 200, 20);
@@ -121,23 +112,26 @@ namespace ETAB_Automation
                 35, 80, 840, 20, italic: true, color: System.Drawing.Color.DarkRed, fontSize: 8);
             y += 118;
 
+            // Podium  ── NOW INDIVIDUAL TABS LIKE BASEMENTS ──
+            var grpP = AddGroupBox(tab,
+                "Podium Floors  (each floor gets its own CAD tab — like Basements)", 20, y, 910, 108);
+            chkPodium = AddCheckBox(grpP, "Include Podium Floors", 15, 25);
+            chkPodium.CheckedChanged += ChkPodium_CheckedChanged;
+            AddLabel(grpP, "Number of Podiums (1–5):", 35, 52, 200, 20);
+            numPodiumLevels = AddNumericCtrl(grpP, 240, 50, 1, 5, 1, enabled: false);
+            numPodiumLevels.ValueChanged += NumPodiumLevels_ValueChanged;
+            AddLabel(grpP, "Each Podium Height (m):", 345, 52, 185, 20);
+            numPodiumHeight = AddNumericCtrl(grpP, 535, 50, 3.0M, 8.0M, 4.5M, decimals: 2, enabled: false);
+            AddLabel(grpP, "⚠️ One CAD tab will be created per podium floor (P1, P2, ...)",
+                35, 80, 840, 20, italic: true, color: System.Drawing.Color.DarkRed, fontSize: 8);
+            y += 118;
+
             // Ground
             var grpGr = AddGroupBox(tab, "Ground Floor", 20, y, 910, 82);
             chkGround = AddCheckBox(grpGr, "Include Ground Floor", 15, 25);
             chkGround.CheckedChanged += ChkGround_CheckedChanged;
             AddLabel(grpGr, "Ground Floor Height (m):", 35, 52, 180, 20);
             numGroundHeight = AddNumericCtrl(grpGr, 220, 50, 3.0M, 10.0M, 4.0M, decimals: 2, enabled: false);
-            y += 92;
-
-            // Podium
-            var grpP = AddGroupBox(tab, "Podium Floors", 20, y, 910, 82);
-            chkPodium = AddCheckBox(grpP, "Include Podium Floors", 15, 25);
-            chkPodium.CheckedChanged += ChkPodium_CheckedChanged;
-            AddLabel(grpP, "Number of Podiums:", 35, 52, 150, 20);
-            numPodiumLevels = AddNumericCtrl(grpP, 190, 50, 1, 5, 1, enabled: false);
-            numPodiumLevels.ValueChanged += NumPodiumLevels_ValueChanged;
-            AddLabel(grpP, "Podium Height (m):", 295, 52, 145, 20);
-            numPodiumHeight = AddNumericCtrl(grpP, 445, 50, 3.0M, 8.0M, 4.5M, decimals: 2, enabled: false);
             y += 92;
 
             // E-Deck
@@ -159,13 +153,24 @@ namespace ETAB_Automation
             numTypicalHeight = AddNumericCtrl(grpT, 530, 50, 2.8M, 5.0M, 3.0M, decimals: 2, enabled: false);
             y += 92;
 
+            // Refuge ── NEW ──────────────────────────────────────────────────
+            var grpR = AddGroupBox(tab,
+                "Refuge Floors  (auto-inserted at every absolute floor position that is a multiple of 5)",
+                20, y, 910, 82);
+            chkRefuge = AddCheckBox(grpR, "Include Refuge Floors (shared single CAD plan)", 15, 25);
+            AddLabel(grpR,
+                "Refuge floors use the same height as Typical floors.  " +
+                "Terrace is always the topmost floor and is never replaced by a Refuge floor.",
+                35, 52, 840, 20, italic: true, color: System.Drawing.Color.DarkOrange, fontSize: 8);
+            y += 92;
+
             // Terrace
-            var grpTr = AddGroupBox(tab, "Terrace Floor", 20, y, 910, 82);
+            var grpTr = AddGroupBox(tab, "Terrace Floor  (always pinned as the topmost floor)", 20, y, 910, 82);
             chkTerrace = AddCheckBox(grpTr, "Include Terrace Floor", 15, 25);
             chkTerrace.CheckedChanged += ChkTerrace_CheckedChanged;
             AddLabel(grpTr, "Terrace Height (m):", 35, 52, 150, 20);
             numTerraceheight = AddNumericCtrl(grpTr, 190, 50, 0.0M, 5.0M, 0.0M, decimals: 2, enabled: false);
-            AddLabel(grpTr, "(0 = reference level only)", 285, 52, 580, 20,
+            AddLabel(grpTr, "(0 = reference level only)", 285, 52, 300, 20,
                 italic: true, color: System.Drawing.Color.Gray);
             y += 92;
 
@@ -255,7 +260,8 @@ namespace ETAB_Automation
             {
                 Name = "WallGrade",
                 HeaderText = "Wall Concrete Grade (bottom → top)",
-                DataSource = new List<string> { "M20", "M25", "M30", "M35", "M40", "M45", "M50", "M55", "M60" },
+                DataSource = new System.Collections.Generic.List<string>
+                    { "M20","M25","M30","M35","M40","M45","M50","M55","M60" },
                 Width = 200
             });
             dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
@@ -343,10 +349,9 @@ namespace ETAB_Automation
             tab.Controls.Add(btnLoad);
             y += 42;
 
-            // Resolve GPL defaults: numTypicalFloors from the UI, seismicZone from combo
             int numFloors = chkTypical.Checked ? (int)numTypicalLevels.Value : 20;
             string seisZone = cmbSeismicZone.SelectedItem?.ToString()
-                                ?? "Zone IV (Ahmedabad & Kolkata)";
+                              ?? "Zone IV (Ahmedabad & Kolkata)";
 
             AddLayerMappingUI(tab, floorType, ref y);
             AddWallThicknessUI(tab, floorType, numFloors, seisZone, ref y);
@@ -367,7 +372,6 @@ namespace ETAB_Automation
             tab.Controls.Add(lstAvail);
             availableLayerListBoxes[floorType] = lstAvail;
 
-            // Centre column x = 340
             AddLabel(tab, "Assign as:", 342, y + 22, 90, 20);
             var cboElem = new ComboBox
             {
@@ -402,26 +406,15 @@ namespace ETAB_Automation
         // ====================================================================
         // WALL THICKNESS UI
         // ====================================================================
-        // Shows GPL table values pre-filled in each spinner.
-        // User can edit — the edited value is used directly (no "0 = auto" logic).
-        // GPL values are read from WallThicknessCalculator.GetRecommendedThickness().
-        // ====================================================================
 
         private void AddWallThicknessUI(TabPage tab, string floorType,
             int numFloors, string seisZone, ref int y)
         {
-            // ── Resolve GPL defaults ────────────────────────────────────────
             int gplCore = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.CoreWall, seisZone);
             int gplPerDead = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralDeadWall, seisZone);
             int gplPerPortal = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralPortalWall, seisZone);
             int gplInternal = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.InternalWall, seisZone);
 
-            // Group box: 4 rows
-            //   Row 1 header / note
-            //   Row 2: Core | Periph.Dead | Periph.Portal
-            //   Row 3: Internal Wall (full row, no NTA overlap)
-            //   Row 4: NTA panel (full-width highlighted row)
-            //   Row 5: footer note
             const int grpH = 195;
             var grp = AddGroupBox(tab,
                 "🧱 Wall Thicknesses — GPL Table (IS 1893-2025)  |  Values pre-filled from GPL; edit to override",
@@ -432,7 +425,6 @@ namespace ETAB_Automation
                 "Edit any value to override for this floor type.",
                 15, 20, 890, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
-            // ── ROW 1 (y=42): Core | Periph.Dead | Periph.Portal ──────────
             const int ry1 = 42;
             AddLabel(grp, "Core Wall (mm):", C1L, ry1, C1N - C1L - 5, 20);
             numCoreWallOverridePerFloor[floorType] =
@@ -449,25 +441,20 @@ namespace ETAB_Automation
             AddLabel(grp, "Periph. Portal Wall (mm):", C3L, ry1, C3N - C3L - 5, 20);
             numPeriphPortalWallOverridePerFloor[floorType] =
                 AddNumericCtrl(grp, C3N, ry1 - 2, 100, 700, gplPerPortal, increment: 25);
-            // no room for GPL label after C3N on right edge — use tooltip instead
             toolTip.SetToolTip(numPeriphPortalWallOverridePerFloor[floorType],
                 $"GPL table value for {numFloors} floors: {gplPerPortal} mm");
 
-            // ── ROW 2 (y=80): Internal Wall — own full row, no NTA nearby ──
             const int ry2 = 80;
             AddLabel(grp, "Internal Wall (mm):", C1L, ry2, C1N - C1L - 5, 20);
             numInternalWallOverridePerFloor[floorType] =
                 AddNumericCtrl(grp, C1N, ry2 - 2, 100, 700, gplInternal, increment: 25);
             AddLabel(grp, $"GPL: {gplInternal}", C1N + NW + 4, ry2 + 2, 62, 16,
                 italic: true, color: System.Drawing.Color.DimGray, fontSize: 7.5f);
-
-            // helpful note beside internal wall
             AddLabel(grp,
                 "(short wall < 1.8 m may require thicker — see GPL table for coupled shear wall cases)",
                 C2L, ry2 + 2, 480, 16,
                 italic: true, color: System.Drawing.Color.Gray, fontSize: 7.5f);
 
-            // ── ROW 3 (y=108): NTA highlighted panel — clear of internal row ─
             const int ry3 = 110;
             var ntaPanel = new System.Windows.Forms.Panel
             {
@@ -485,7 +472,6 @@ namespace ETAB_Automation
                 "Not in GPL table — enter actual partition / non-structural wall thickness for this floor.",
                 8, 25, 855, 16, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
 
-            // ── Footer note ────────────────────────────────────────────────
             AddLabel(grp,
                 "Wall pier labels in ETABS: P1, P2, P3 … (auto-assigned per wall element)",
                 C1L, 162, 880, 16, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
@@ -493,57 +479,34 @@ namespace ETAB_Automation
             y += grpH + 8;
         }
 
-        /// <summary>
-        /// Safely calls GetRecommendedThickness; returns a sensible fallback on error.
-        /// </summary>
         private static int SafeGetGPL(int floors,
             Core.WallThicknessCalculator.WallType wallType, string seisZone)
         {
             try
             {
                 int f = Math.Max(1, Math.Min(50, floors));
-                return Core.WallThicknessCalculator.GetRecommendedThickness(
-                    f, wallType, seisZone);
+                return Core.WallThicknessCalculator.GetRecommendedThickness(f, wallType, seisZone);
             }
             catch
             {
-                // fallback if zone string not recognised yet
                 return wallType == Core.WallThicknessCalculator.WallType.CoreWall ? 300 : 200;
             }
         }
 
         // ====================================================================
-        // BEAM DEPTHS UI — clean fixed-grid, no overlap
+        // BEAM DEPTHS UI
         // ====================================================================
 
         private void AddBeamDepthsUI(TabPage tab, string floorType,
             List<(string label, string dictKey)> namedGravityBeams, ref int y)
         {
             int extraRows = namedGravityBeams?.Count ?? 0;
-            // Rows layout (each RH=32px):
-            //  header line      ~22
-            //  GRAVITY header   ~22
-            //  row: Internal | Cantilever | GravWidth     RH
-            //  row: No-Load gravity                       RH
-            //  extra named rows                           RH * n
-            //  note line        ~20
-            //  MAIN header      ~22
-            //  row: Core depth | Periph.Dead depth        RH
-            //  row: Core W ovr | Dead W ovr               RH
-            //  row: Portal depth | Portal W ovr           RH
-            //  row: Internal depth | Internal W ovr       RH
-            //  note line        ~28
-            //  bottom padding   ~10
-
-            int grpHeight = 26 + 24                  // header + gravity label
-                          + RH                        // internal/cantilever/width
-                          + RH                        // no-load
-                          + (RH * extraRows)          // named gravity
-                          + 22                        // note
-                          + 26                        // main header
-                          + RH + RH + RH + RH         // 4 main beam rows
-                          + 30                        // note
-                          + 10;                       // pad
+            int grpHeight = 26 + 24
+                          + RH + RH
+                          + (RH * extraRows)
+                          + 22 + 26
+                          + RH + RH + RH + RH
+                          + 30 + 10;
 
             var grp = AddGroupBox(tab,
                 "🔧 Beam Configuration — Depth (mm, user input) | Width (mm, auto or override)",
@@ -554,32 +517,26 @@ namespace ETAB_Automation
                 $"Auto gravity width: {gw} mm (seismic zone)   |   Main beam (MB) width = matching wall thickness   |   Width override 0 = auto",
                 15, 20, 890, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
-            int gy = 46;   // current y inside groupbox
+            int gy = 46;
 
             // ── GRAVITY BEAMS ─────────────────────────────────────────────
-            AddLabel(grp, "─── GRAVITY BEAMS ───", C1L, gy, 260, 18,
-                bold: true, fontSize: 8.5f);
+            AddLabel(grp, "─── GRAVITY BEAMS ───", C1L, gy, 260, 18, bold: true, fontSize: 8.5f);
             gy += 24;
 
-            // Row 1: Internal Gravity | Cantilever Gravity | Gravity Width override
             AddLabel(grp, "B-Internal Gravity Beams depth:", C1L, gy, C1N - C1L - 5, 20);
             numInternalGravityDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 200, 1200, 450, increment: 25);
-
             AddLabel(grp, "B-Cantilever Gravity Beams depth:", C2L, gy, C2N - C2L - 5, 20);
             numCantileverGravityDepthPerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 200, 1200, 500, increment: 25);
-
             AddLabel(grp, "Gravity Width override (0=auto):", C3L, gy, C3N - C3L - 5, 20);
             numGravityWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C3N, gy - 2, 0, 500, 0, increment: 10);
             gy += RH;
 
-            // Row 2: No Load Gravity
             AddLabel(grp, "B-No Load Gravity Beams depth:", C1L, gy, C1N - C1L - 5, 20);
             numNoLoadGravityDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 200, 1200, 450, increment: 25);
             AddLabel(grp, "(Wall load = 0 kN/m; depth user input)", C2L, gy, 400, 18,
                 italic: true, color: System.Drawing.Color.Gray, fontSize: 7.5f);
             gy += RH;
 
-            // Extra named gravity rows (context-sensitive per floor type)
             if (namedGravityBeams != null)
             {
                 foreach (var (beamLabel, dictKey) in namedGravityBeams)
@@ -598,7 +555,6 @@ namespace ETAB_Automation
                 }
             }
 
-            // Note
             AddLabel(grp,
                 "(Named gravity variants above use their own depth. Beam load assigned per CAD layer.)",
                 C1L, gy, 880, 16, italic: true, color: System.Drawing.Color.Gray, fontSize: 7.5f);
@@ -609,34 +565,26 @@ namespace ETAB_Automation
                 bold: true, fontSize: 8.5f);
             gy += 26;
 
-            // Row: Core Main depth | Core Main width override
             AddLabel(grp, "B-Core Main Beams depth:", C1L, gy, C1N - C1L - 5, 20);
             numCoreMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 600, increment: 25);
-
             AddLabel(grp, "B-Core Main Beams width override:", C2L, gy, C2N - C2L - 5, 20);
             numCoreMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
             gy += RH;
 
-            // Row: Periph. Dead depth | Periph. Dead width override
             AddLabel(grp, "B-Peripheral Dead Main depth:", C1L, gy, C1N - C1L - 5, 20);
             numPeripheralDeadMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 600, increment: 25);
-
             AddLabel(grp, "B-Peripheral Dead width override:", C2L, gy, C2N - C2L - 5, 20);
             numPeripheralDeadMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
             gy += RH;
 
-            // Row: Periph. Portal depth | Periph. Portal width override
             AddLabel(grp, "B-Peripheral Portal Main depth:", C1L, gy, C1N - C1L - 5, 20);
             numPeripheralPortalMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 650, increment: 25);
-
             AddLabel(grp, "B-Peripheral Portal width override:", C2L, gy, C2N - C2L - 5, 20);
             numPeripheralPortalMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
             gy += RH;
 
-            // Row: Internal Main depth | Internal Main width override
             AddLabel(grp, "B-Internal Main Beams depth:", C1L, gy, C1N - C1L - 5, 20);
             numInternalMainDepthPerFloor[floorType] = AddNumericCtrl(grp, C1N, gy - 2, 300, 1500, 550, increment: 25);
-
             AddLabel(grp, "B-Internal Main width override:", C2L, gy, C2N - C2L - 5, 20);
             numInternalMainWidthOverridePerFloor[floorType] = AddNumericCtrl(grp, C2N, gy - 2, 0, 600, 0, increment: 25);
             gy += RH;
@@ -664,26 +612,21 @@ namespace ETAB_Automation
                 "YELLOW layers below: fixed user input (structural special-purpose slabs).",
                 15, 20, 880, 46, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
-            // Four-column slab grid
-            // Label widths kept to 115px, numeric at label+118
             const int s1l = 20, s1n = 140;
             const int s2l = 250, s2n = 370;
             const int s3l = 490, s3n = 610;
             const int s4l = 730, s4n = 828;
-            const int sr = 32;   // slab row height
+            const int sr = 32;
 
             int sy = 72;
 
             // Row 1
             AddLabel(grp, "S-LOBBY:", s1l, sy, 115, 20);
             numLobbySlabThicknessPerFloor[floorType] = AddNumericCtrl(grp, s1n, sy - 2, 100, 400, 160, increment: 5);
-
             AddLabel(grp, "S-STAIRCASE:", s2l, sy, 115, 20);
             numStairSlabThicknessPerFloor[floorType] = AddNumericCtrl(grp, s2n, sy - 2, 100, 400, 175, increment: 5);
-
             AddLabel(grp, "S-FIRE TENDER:", s3l, sy, 115, 20);
             numFireTenderSlabPerFloor[floorType] = AddNumericCtrl(grp, s3n, sy - 2, 100, 500, 200, increment: 5);
-
             AddLabel(grp, "S-OHT:", s4l, sy, 90, 20);
             numOHTSlabPerFloor[floorType] = AddNumericCtrl(grp, s4n, sy - 2, 100, 600, 200, increment: 5);
             sy += sr;
@@ -691,13 +634,10 @@ namespace ETAB_Automation
             // Row 2
             AddLabel(grp, "S-TERRACE FIRE:", s1l, sy, 115, 20);
             numTerraceFireSlabPerFloor[floorType] = AddNumericCtrl(grp, s1n, sy - 2, 100, 600, 200, increment: 5);
-
             AddLabel(grp, "S-UGT:", s2l, sy, 115, 20);
             numUGTSlabPerFloor[floorType] = AddNumericCtrl(grp, s2n, sy - 2, 100, 600, 250, increment: 5);
-
             AddLabel(grp, "S-LANDSCAPE:", s3l, sy, 115, 20);
             numLandscapeSlabPerFloor[floorType] = AddNumericCtrl(grp, s3n, sy - 2, 100, 500, 175, increment: 5);
-
             AddLabel(grp, "S-SWIMMING:", s4l, sy, 90, 20);
             numSwimmingSlabPerFloor[floorType] = AddNumericCtrl(grp, s4n, sy - 2, 100, 500, 250, increment: 5);
             sy += sr;
@@ -705,7 +645,6 @@ namespace ETAB_Automation
             // Row 3
             AddLabel(grp, "S-DG:", s1l, sy, 115, 20);
             numDGSlabPerFloor[floorType] = AddNumericCtrl(grp, s1n, sy - 2, 100, 500, 200, increment: 5);
-
             AddLabel(grp, "S-STP:", s2l, sy, 115, 20);
             numSTPSlabPerFloor[floorType] = AddNumericCtrl(grp, s2n, sy - 2, 100, 500, 200, increment: 5);
             sy += sr;
@@ -731,6 +670,7 @@ namespace ETAB_Automation
                 return;
             }
 
+            // Remove all existing floor tabs (keep Building Config + Concrete Grades)
             while (tabControl.TabPages.Count > 2)
                 tabControl.TabPages.RemoveAt(2);
 
@@ -738,6 +678,7 @@ namespace ETAB_Automation
 
             int tabCount = 0;
 
+            // ── Basements — one tab each ──────────────────────────────────
             if (chkBasement.Checked)
             {
                 int cnt = (int)numBasementLevels.Value;
@@ -749,13 +690,19 @@ namespace ETAB_Automation
                 }
             }
 
+            // ── Podiums — one tab each (individual, like Basements) ───────
             if (chkPodium.Checked)
             {
-                CreateCADImportTab("Podium", "Podium Floor Plan",
-                    new List<(string, string)> { ("B-Podium Gravity Beams", "Podium") });
-                tabCount++;
+                int cnt = (int)numPodiumLevels.Value;
+                for (int i = 1; i <= cnt; i++)
+                {
+                    CreateCADImportTab($"Podium{i}", $"Podium {i} Floor Plan",
+                        new List<(string, string)> { ($"B-Podium{i} Gravity Beams", "Podium") });
+                    tabCount++;
+                }
             }
 
+            // ── Ground ───────────────────────────────────────────────────
             if (chkGround.Checked)
             {
                 CreateCADImportTab("Ground", "Ground Floor Plan",
@@ -763,6 +710,7 @@ namespace ETAB_Automation
                 tabCount++;
             }
 
+            // ── E-Deck ───────────────────────────────────────────────────
             if (chkEDeck.Checked)
             {
                 CreateCADImportTab("EDeck", "E-Deck Floor Plan",
@@ -770,12 +718,22 @@ namespace ETAB_Automation
                 tabCount++;
             }
 
+            // ── Typical ──────────────────────────────────────────────────
             if (chkTypical.Checked)
             {
                 CreateCADImportTab("Typical", "Typical Floor Plan (replicated for all typical floors)");
                 tabCount++;
             }
 
+            // ── Refuge — one shared tab ────────────────────────────────
+            if (chkRefuge.Checked)
+            {
+                CreateCADImportTab("Refuge",
+                    "Refuge Floor Plan (shared — auto-inserted at every absolute floor position divisible by 5)");
+                tabCount++;
+            }
+
+            // ── Terrace ──────────────────────────────────────────────────
             if (chkTerrace.Checked)
             {
                 CreateCADImportTab("Terrace", "Terrace Floor Plan");
@@ -784,13 +742,23 @@ namespace ETAB_Automation
 
             UpdateTotalFloorsForGradeSchedule();
 
-            string bNote = chkBasement.Checked
-                ? $"\n• {(int)numBasementLevels.Value} individual basement tab(s) created (B1, B2 ...)"
-                : "";
+            // Build info note
+            var notes = new System.Text.StringBuilder();
+            if (chkBasement.Checked)
+                notes.AppendLine($"• {(int)numBasementLevels.Value} individual basement tab(s): B1, B2, ...");
+            if (chkPodium.Checked)
+                notes.AppendLine($"• {(int)numPodiumLevels.Value} individual podium tab(s): P1, P2, ...");
+            if (chkRefuge.Checked)
+            {
+                // Preview which absolute positions will be Refuge
+                var refugePreview = PreviewRefugePositions();
+                notes.AppendLine($"• Refuge floors at absolute positions: {string.Join(", ", refugePreview)}");
+            }
 
             MessageBox.Show(
-                $"✓ {tabCount} CAD Import tab(s) generated!{bNote}\n\n" +
-                "Wall thicknesses are pre-filled from the GPL table (IS 1893-2025).\n" +
+                $"✓ {tabCount} CAD Import tab(s) generated!\n\n" +
+                notes.ToString() +
+                "\nWall thicknesses are pre-filled from the GPL table (IS 1893-2025).\n" +
                 "Edit any value to override for that specific floor type.\n\n" +
                 "For each floor tab:\n" +
                 "  1. Browse & load DXF file\n" +
@@ -800,6 +768,27 @@ namespace ETAB_Automation
                 "  5. Set YELLOW slab thicknesses\n\n" +
                 "Then complete the Concrete Grades schedule.",
                 "Tabs Generated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        /// <summary>
+        /// Calculates which absolute floor positions (1-based) will be Refuge floors,
+        /// based on current building config — for preview in the info dialog.
+        /// Terrace (last position) is exempt.
+        /// </summary>
+        private List<int> PreviewRefugePositions()
+        {
+            int total = 0;
+            if (chkBasement.Checked) total += (int)numBasementLevels.Value;
+            if (chkPodium.Checked) total += (int)numPodiumLevels.Value;
+            if (chkGround.Checked) total += 1;
+            if (chkEDeck.Checked) total += 1;
+            if (chkTypical.Checked) total += (int)numTypicalLevels.Value;
+            // Terrace adds 1 but is exempt — it occupies position total+1
+
+            var positions = new List<int>();
+            for (int i = 1; i <= total; i++)
+                if (i % 5 == 0) positions.Add(i);
+            return positions;
         }
 
         // ====================================================================
@@ -897,15 +886,12 @@ namespace ETAB_Automation
             {
                 Text = text,
                 Location = new System.Drawing.Point(x, y),
-                Size = new System.Drawing.Size(320, 20)
+                Size = new System.Drawing.Size(420, 20)
             };
             parent.Controls.Add(chk);
             return chk;
         }
 
-        /// <summary>
-        /// Renamed from AddNumeric to AddNumericCtrl to avoid any ambiguity with overloads.
-        /// </summary>
         private NumericUpDown AddNumericCtrl(Control parent, int x, int y,
             decimal min, decimal max, decimal value,
             int decimals = 0, decimal increment = 1, bool enabled = true)

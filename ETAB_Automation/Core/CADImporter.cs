@@ -1,8 +1,10 @@
 ﻿
 // ============================================================================
-// FILE: Core/CADImporterEnhanced.cs — VERSION 3.3
-// ============================================================================
-
+// FILE: Core/CADImporterEnhanced.cs — VERSION 3.4
+// FIXES:
+//   [FIX-1] NtaWallThickness now passed to WallImporterEnhanced per floor
+//   [FIX-2] WallThicknessOverrides now passed to WallImporterEnhanced per floor
+//   [FIX-3] CalculateTotalTypicalFloors now counts Refuge floors too
 // ============================================================================
 
 using ETAB_Automation.Models;
@@ -26,7 +28,7 @@ namespace ETAB_Automation.Core
 
         public CADImporterEnhanced(cSapModel model)
         {
-            sapModel     = model;
+            sapModel = model;
             storyManager = new StoryManager(model);
         }
 
@@ -42,14 +44,14 @@ namespace ETAB_Automation.Core
             try
             {
                 Debug.WriteLine("\n╔════════════════════════════════════════════════════╗");
-                Debug.WriteLine("║  CAD IMPORTER v3.3 — TERRACE + SETSTORIES FIXED   ║");
+                Debug.WriteLine("║  CAD IMPORTER v3.4 — ALL BUGS FIXED               ║");
                 Debug.WriteLine("╚════════════════════════════════════════════════════╝\n");
 
                 sapModel.SetModelIsLocked(false);
                 sapModel.SetPresentUnits(eUnits.N_m_C);
 
                 var gradeSchedule = new GradeScheduleManager(wallGrades, floorsPerGrade);
-                int totalStories  = storyHeights.Count;
+                int totalStories = storyHeights.Count;
 
                 if (!gradeSchedule.ValidateTotalFloors(totalStories))
                 {
@@ -60,19 +62,19 @@ namespace ETAB_Automation.Core
                     return false;
                 }
 
+                // [FIX-3] Count both Typical AND Refuge floors
                 int totalTypicalFloors = CalculateTotalTypicalFloors(floorConfigs);
 
                 ShowDesignNotes(floorConfigs, totalTypicalFloors, seismicZone,
                                 gradeSchedule, foundationHeight);
 
                 Debug.WriteLine("\n📐 Creating building stories...");
-                // StoryManager v2.5: similar[]=null fix + duplicate name guard + diagnostic dump
                 storyManager.DefineStoriesWithCustomNames(storyHeights, storyNames, foundationHeight);
 
                 WallThicknessCalculator.LoadAvailableWallSections(sapModel);
 
                 // ============================================================
-                // FOUNDATION WALLS (walls only — no beams, no slabs)
+                // FOUNDATION WALLS
                 // ============================================================
                 if (foundationHeight > 0)
                 {
@@ -101,18 +103,21 @@ namespace ETAB_Automation.Core
                             return false;
                         }
 
+                        // [FIX-1][FIX-2] Pass NTA thickness and wall overrides for foundation
                         var foundationWallImporter = new WallImporterEnhanced(
                             sapModel,
                             foundationDxf,
                             foundationHeight,
                             totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
                             seismicZone,
-                            gradeSchedule);
+                            gradeSchedule,
+                            firstBasement.NtaWallThickness,
+                            firstBasement.WallThicknessOverrides);
 
                         foundationWallImporter.ImportWalls(
                             firstBasement.LayerMapping,
-                            0.0,   // base of building (below foundation)
-                            0);    // story index 0 for grade lookup
+                            0.0,
+                            0);
 
                         Debug.WriteLine("   ✓ Foundation walls created");
                         sapModel.View.RefreshView(0, false);
@@ -165,21 +170,13 @@ namespace ETAB_Automation.Core
                             return false;
                         }
 
-                        double baseElevation  = storyManager.GetStoryBaseElevation(currentStoryIndex);
-                        double topElevation   = storyManager.GetStoryTopElevation(currentStoryIndex);
+                        double baseElevation = storyManager.GetStoryBaseElevation(currentStoryIndex);
+                        double topElevation = storyManager.GetStoryTopElevation(currentStoryIndex);
                         double thisFloorHeight = topElevation - baseElevation;
 
-                        string wallGrade     = gradeSchedule.GetWallGrade(currentStoryIndex);
+                        string wallGrade = gradeSchedule.GetWallGrade(currentStoryIndex);
                         string beamSlabGrade = gradeSchedule.GetBeamSlabGrade(currentStoryIndex);
 
-                        // --------------------------------------------------------
-                        // FIX: Terrace elements must be placed at the ETABS-actual
-                        // elevation (120.001m), not the computed top (120.000m).
-                        // ETABS assigns Terrace top = base + 0.001m nominal height,
-                        // so elements placed at 120.000m end up in Story34's plan,
-                        // not the Terrace plan view.
-                        // For all other stories, use baseElevation (slab-at-base convention).
-                        // --------------------------------------------------------
                         bool isTerraceStory = storyNames[currentStoryIndex]
                             .Equals("Terrace", StringComparison.OrdinalIgnoreCase);
 
@@ -194,19 +191,17 @@ namespace ETAB_Automation.Core
                         Debug.WriteLine($"       Top        : {topElevation:F3}m");
                         Debug.WriteLine($"       Height     : {thisFloorHeight:F3}m");
                         Debug.WriteLine($"       IsTerrace  : {isTerraceStory}");
-                        Debug.WriteLine($"\n       Placement:");
-                        Debug.WriteLine($"         Walls  → base={placementElevation:F3}m, " +
-                                        $"height={thisFloorHeight:F3}m");
-                        Debug.WriteLine($"         Beams  → {placementElevation:F3}m");
-                        Debug.WriteLine($"         Slabs  → {placementElevation:F3}m");
+                        Debug.WriteLine($"       NTA wall   : {floorConfig.NtaWallThickness}mm");
 
-                        // Wall importer is per-floor (thisFloorHeight changes each story)
+                        // [FIX-1][FIX-2] Pass NTA thickness and wall overrides per floor
                         var wallImporter = new WallImporterEnhanced(
                             sapModel, dxfDoc,
                             thisFloorHeight,
                             totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
                             seismicZone,
-                            gradeSchedule);
+                            gradeSchedule,
+                            floorConfig.NtaWallThickness,
+                            floorConfig.WallThicknessOverrides);
 
                         wallImporter.ImportWalls(
                             floorConfig.LayerMapping,
@@ -256,71 +251,59 @@ namespace ETAB_Automation.Core
         // HELPERS
         // ====================================================================
 
+        /// <summary>
+        /// [FIX-3] Count Typical AND Refuge floors (both share the typical
+        /// floor plan and height).  Previously only "Typical" was counted,
+        /// returning 0 when all typical slots were replaced by Refuge, which
+        /// caused the wrong total to be passed to GPL wall-thickness lookups.
+        /// </summary>
         private int CalculateTotalTypicalFloors(List<FloorTypeConfig> configs)
         {
+            int total = 0;
             foreach (var c in configs)
-                if (c.Name == "Typical") return c.Count;
-            return 0;
+                if (c.Name == "Typical" || c.Name == "Refuge")
+                    total += c.Count;
+            return total;
         }
 
         private void ShowDesignNotes(
             List<FloorTypeConfig> floorConfigs, int totalTypicalFloors,
-            string seismicZone, GradeScheduleManager gradeSchedule,
-            double foundationHeight)
+            string seismicZone, GradeScheduleManager gradeSchedule, double foundationHeight)
         {
             var msg = new StringBuilder();
-            msg.AppendLine("═══════════════════════════════════════");
-            msg.AppendLine($"Zone {seismicZone} | Building Configuration");
-            msg.AppendLine("═══════════════════════════════════════\n");
+            msg.AppendLine($"Zone {seismicZone}" +
+                (foundationHeight > 0 ? $" | Fdn {foundationHeight:F2}m (walls only, B1 plan)" : ""));
 
-            if (foundationHeight > 0)
-            {
-                msg.AppendLine($"🏗️ FOUNDATION:");
-                msg.AppendLine($"  Height: {foundationHeight:F2}m  (walls only — no beams/slabs)");
-                msg.AppendLine($"  CAD:    Using Basement1 plan");
-                msg.AppendLine();
-            }
-
-            msg.AppendLine("FLOOR BREAKDOWN:");
-            int basementCount = 0;
+            msg.AppendLine("\nFLOORS:");
+            int bCount = 0;
             foreach (var c in floorConfigs)
-            {
-                if (c.IsIndividualBasement)
-                {
-                    basementCount++;
-                    msg.AppendLine($"  B{c.BasementNumber} — {c.Name}: {c.Height:F2}m  (1 floor)");
-                }
-                else
-                    msg.AppendLine($"  {c.Name}: {c.Count} × {c.Height:F2}m");
-            }
-            if (basementCount > 0)
-                msg.AppendLine($"\n  Total Individual Basements: {basementCount}");
+                msg.AppendLine(c.IsIndividualBasement
+                    ? $"  B{c.BasementNumber} {c.Name}: {c.Height:F2}m" + (++bCount > 0 ? "" : "")
+                    : $"  {c.Name}: {c.Count}×{c.Height:F2}m");
+            if (bCount > 0) msg.AppendLine($"  ({bCount} individual basements)");
 
-            msg.AppendLine("\nCONCRETE GRADES:");
+            msg.AppendLine("\nGRADES:");
             foreach (var r in gradeSchedule.GetGradeRanges())
-                msg.AppendLine($"  F{r.StartFloor + 1:D2}-F{r.EndFloor + 1:D2}: {r.WallGrade} / {r.BeamSlabGrade}");
+                msg.AppendLine($"  F{r.StartFloor + 1:D2}-{r.EndFloor + 1:D2}: {r.WallGrade}/{r.BeamSlabGrade}");
 
-            msg.AppendLine("\nBEAM/SLAB CONFIG:");
+            msg.AppendLine("\nBEAMS:");
             foreach (var c in floorConfigs)
             {
-                string prefix = c.IsIndividualBasement ? $"B{c.BasementNumber}" : c.Name;
-                msg.AppendLine($"  {prefix}: " +
-                    $"Grav {c.BeamDepths["InternalGravity"]}/{c.BeamDepths["CantileverGravity"]}mm | " +
-                    $"Main {c.BeamDepths["CoreMain"]}/{c.BeamDepths["PeripheralPortalMain"]}mm | " +
-                    $"Slab {c.SlabThicknesses["Lobby"]}/{c.SlabThicknesses["Stair"]}mm");
+                string p = c.IsIndividualBasement ? $"B{c.BasementNumber}" : c.Name;
+                msg.AppendLine($"  {p}: Grav {c.BeamDepths["InternalGravity"]}/{c.BeamDepths["CantileverGravity"]} " +
+                               $"Main {c.BeamDepths["CoreMain"]}/{c.BeamDepths["PeripheralPortalMain"]} " +
+                               $"Slab {c.SlabThicknesses["Lobby"]}/{c.SlabThicknesses["Stair"]}mm");
             }
 
-            int refFloors = totalTypicalFloors > 0 ? totalTypicalFloors : floorConfigs.Sum(c => c.Count);
-            int coreThick = WallThicknessCalculator.GetRecommendedThickness(
-                refFloors, WallThicknessCalculator.WallType.CoreWall, seismicZone, 2.0, false);
-            int periThick = WallThicknessCalculator.GetRecommendedThickness(
-                refFloors, WallThicknessCalculator.WallType.PeripheralDeadWall, seismicZone, 2.0, false);
-            msg.AppendLine($"\nRECOMMENDED WALLS: Core ~{coreThick}mm | Peripheral ~{periThick}mm");
-            msg.AppendLine("\n═══════════════════════════════════════");
+            int refs = totalTypicalFloors > 0 ? totalTypicalFloors : floorConfigs.Sum(c => c.Count);
+            int core = WallThicknessCalculator.GetRecommendedThickness(
+                refs, WallThicknessCalculator.WallType.CoreWall, seismicZone, 2.0, false);
+            int peri = WallThicknessCalculator.GetRecommendedThickness(
+                refs, WallThicknessCalculator.WallType.PeripheralDeadWall, seismicZone, 2.0, false);
+            msg.AppendLine($"\nWalls: Core ~{core}mm | Peripheral ~{peri}mm");
 
-            if (MessageBox.Show(msg.ToString() + "\n\nProceed with import?",
-                "Confirm Configuration", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
-                != DialogResult.Yes)
+            if (MessageBox.Show(msg.ToString(), "Confirm Import",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 throw new Exception("Import cancelled by user");
         }
 
@@ -339,7 +322,7 @@ namespace ETAB_Automation.Core
                 sb.AppendLine($"Foundation:       {foundationHeight:F2}m (walls only)");
             sb.AppendLine($"Seismic Zone:     {seismicZone}");
             if (typicalFloors > 0)
-                sb.AppendLine($"Typical Floors:   {typicalFloors}");
+                sb.AppendLine($"Typical+Refuge:   {typicalFloors}");
             sb.AppendLine();
             sb.AppendLine("FLOOR SUMMARY:");
             foreach (var c in configs)
