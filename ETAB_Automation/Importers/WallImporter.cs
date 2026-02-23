@@ -1,16 +1,7 @@
 ﻿
 // ============================================================================
 // FILE: Importers/WallImporterEnhanced.cs
-// VERSION: 3.1 — Full fix set
-// FIXES:
-//   [FIX-1] GetStoryName: ETABS GetNameList returns stories top-down; index
-//           was used as-is (bottom-up) causing wrong story assignment and
-//           index-out-of-bounds on model save.  Now flipped: names[n-1-story].
-//   [FIX-2] WallThicknessOverrides parameter added; per-floor GPL overrides
-//           from the UI are now applied before the GPL table fallback.
-//   [FIX-3] NtaWallThickness parameter properly plumbed through (was already
-//           present but callers never passed floorConfig.NtaWallThickness).
-//   [FIX-4] FindClosestWallSection helper added to support FIX-2.
+
 // ============================================================================
 
 using ETAB_Automation.Core;

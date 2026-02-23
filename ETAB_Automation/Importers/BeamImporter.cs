@@ -1,17 +1,7 @@
 ﻿
 // ============================================================================
 // FILE: Importers/BeamImporterEnhanced.cs
-// VERSION: 3.2 — GetStoryName index flip fix
-// FIXES (on top of v3.1):
-//   [FIX-1] GetStoryName: ETABS GetNameList returns stories top-down; index
-//           was used as-is (bottom-up) causing wrong story assignment and
-//           index-out-of-bounds crash on model save. Flipped to names[n-1-story].
-//
-// All v3.1 fixes retained:
-//   [v3.1-FIX-1] beamWidthOverrides wired through constructor
-//   [v3.1-FIX-2] GravityBeamWidth() respects GravityWidth override
-//   [v3.1-FIX-3] Main beam width checks per-type override before GPL calc
-//   [v3.1-FIX-4] B-No Load layer uses "NoLoadGravity" key (not InternalGravity)
+
 // ============================================================================
 
 using ETAB_Automation.Core;

@@ -19,7 +19,31 @@
     </Reference>
   </ItemGroup>
 
-	
+	<ItemGroup>
+
+		<!-- Main form file — stays as-is; owns the .resx resource -->
+		<Compile Update="UI\ImportConfigForm.cs">
+			<SubType>Form</SubType>
+		</Compile>
+
+		<!-- Designer / generated code — if you have one -->
+		<Compile Update="UI\ImportConfigForm.Designer.cs">
+			<DependentUpon>ImportConfigForm.cs</DependentUpon>
+		</Compile>
+
+		<!-- Part 2 UI file — dot suffix tells MSBuild it is a dependent,
+       not an independent form class, so NO separate .resources is created -->
+		<Compile Update="UI\ImportConfigForm.UI.cs">
+			<DependentUpon>ImportConfigForm.cs</DependentUpon>
+			<SubType>Code</SubType>
+		</Compile>
+
+		<!-- Resource file — only ONE, owned by the main form file -->
+		<EmbeddedResource Update="UI\ImportConfigForm.resx">
+			<DependentUpon>ImportConfigForm.cs</DependentUpon>
+		</EmbeddedResource>
+
+	</ItemGroup>
 
 
 </Project>

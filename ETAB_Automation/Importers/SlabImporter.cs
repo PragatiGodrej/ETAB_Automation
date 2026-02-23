@@ -1,12 +1,7 @@
 ﻿
 // ============================================================================
 // FILE: Importers/SlabImporterEnhanced.cs
-// VERSION: 3.0 — Full slab layer catalogue per specification
-// ============================================================================
-// Slab thickness rules:
-//   CYAN  layers  → Cantilever (user input based on span)
-//   YELLOW layers → User input fixed thickness (passed via slabConfig)
-//   WHITE  layers → User input area rule (auto from polygon area)
+
 // ============================================================================
 
 using ETABSv1;

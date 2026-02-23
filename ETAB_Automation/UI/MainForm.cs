@@ -274,7 +274,7 @@ namespace ETAB_Automation
                 case "Ground": return "Ground";
                 case "EDeck": return "EDeck";
                 case "Typical": return $"Story{index + 1:D2}";
-                case "Refuge": return $"Refuge{index + 1:D2}";   // refuge floors get unique names
+                //case "Refuge": return $"Refuge{index + 1:D2}";   // refuge floors get unique names
                 case "Terrace": return "Terrace";
                 default: return $"{floorType}{index + 1}";
             }

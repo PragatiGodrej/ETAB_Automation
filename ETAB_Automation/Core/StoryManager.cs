@@ -1,18 +1,8 @@
 ﻿
 // ============================================================================
-// FILE: Core/StoryManager.cs — VERSION 2.5
+// FILE: Core/StoryManager.cs — VERSION 2.7
 // ============================================================================
-// FIXES (on top of v2.4):
-//   [FIX-1] similar[] array: pass null instead of "" for master stories.
-//           Passing "" caused ETABS to store an invalid story reference in its
-//           internal index table, which serialised correctly in memory but
-//           produced "Index was outside the bounds of the array" when writing
-//           the .EDB file to disk.
-//   [FIX-2] Terrace nominal height: increased from 0.001m to 0.01m (10mm).
-//           0.001m caused ETABS to allocate an effectively zero-size element
-//           index slot for the Terrace story; any element whose elevation
-//           rounded to the Terrace boundary would reference an out-of-range
-//           slot during .EDB serialisation.
+
 // ============================================================================
 
 using ETABSv1;
@@ -29,6 +19,7 @@ namespace ETAB_Automation.Core
         private Dictionary<int, double> storyTopElevations;
         private Dictionary<string, int> storyNameToIndex;
         private List<string> storyNames;
+        private List<double> storyUserHeights; // store original user heights
 
         public StoryManager(cSapModel model)
         {
@@ -37,14 +28,22 @@ namespace ETAB_Automation.Core
             storyTopElevations = new Dictionary<int, double>();
             storyNameToIndex = new Dictionary<string, int>();
             storyNames = new List<string>();
+            storyUserHeights = new List<double>();
         }
 
         // ====================================================================
         // PRIMARY METHOD
-        // foundationHeight → base offset for ALL stories.
-        //   Pass 0.0 when there is no foundation (default behaviour unchanged).
-        //   Pass e.g. 1.5 when there is a 1.5 m foundation raft/wall below
-        //   the first defined story.
+        //
+        // TERRACE BEHAVIOUR (v2.7):
+        //   • Terrace SLAB is placed at baseElevation  (= top of last real story)
+        //   • storyTopElevations[terraceIdx] == storyBaseElevations[terraceIdx]
+        //     so GetStoryHeight(terraceIdx) == 0  → slab placement elevation = base ✓
+        //   • Wall importer uses GetTerraceParapetHeight() to build parapet walls
+        //     from base upward by the user-supplied parapet height.
+        //   • ETABS itself receives the real parapet height (or 0.01m guard if 0)
+        //     so the story is visible in the UI at the correct top level.
+        //   • cumulativeHeight is NOT incremented for Terrace so subsequent
+        //     index lookups remain consistent.
         // ====================================================================
         public void DefineStoriesWithCustomNames(
             List<double> storyHeights,
@@ -67,21 +66,13 @@ namespace ETAB_Automation.Core
                 if (!isTerrace && storyHeights[i] <= 0.0)
                     throw new ArgumentException(
                         $"Story '{storyNames[i]}' (index {i}) has height {storyHeights[i]:F3}m. " +
-                        $"All story heights must be > 0 (Terrace is the only exception).");
+                        $"All story heights must be > 0 (Terrace may be 0 if no parapet).");
             }
 
             sapModel.SetModelIsLocked(false);
 
             // ----------------------------------------------------------------
             // [FIX-3] Fresh model guard
-            // If a previous import already defined stories, their element-to-
-            // story index references still exist in ETABS memory.  Calling
-            // SetStories_2 again redefines the story array but does NOT purge
-            // the old element references — they now point to stale/invalid
-            // index slots and cause "Index was outside the bounds of the array"
-            // when ETABS serialises the .EDB file.
-            // Solution: detect any existing stories and reinitialise the model
-            // before redefining, so ETABS starts with a clean index table.
             // ----------------------------------------------------------------
             int existingCount = 0;
             string[] existingNames = null;
@@ -91,8 +82,6 @@ namespace ETAB_Automation.Core
                 System.Diagnostics.Debug.WriteLine(
                     $"⚠ [FIX-3] {existingCount} stories already in model — " +
                     $"reinitialising to clear stale element-story index references");
-                //sapModel.InitializeNewModel(eUnits.N_m_C);
-            
             }
 
             System.Diagnostics.Debug.WriteLine("\n========== UNIT SYSTEM CHECK ==========");
@@ -104,6 +93,7 @@ namespace ETAB_Automation.Core
             int numStories = storyHeights.Count;
 
             this.storyNames = new List<string>(storyNames);
+            this.storyUserHeights = new List<double>(storyHeights);
             storyBaseElevations.Clear();
             storyTopElevations.Clear();
             storyNameToIndex.Clear();
@@ -130,49 +120,60 @@ namespace ETAB_Automation.Core
                     "Terrace", StringComparison.OrdinalIgnoreCase);
 
                 names[i] = storyNames[i];
-
-                // [FIX-2] Use 0.01m (10mm) nominal height for Terrace instead
-                //         of 0.001m (1mm).  0.001m caused ETABS to allocate an
-                //         effectively zero-size element index slot, leading to
-                //         out-of-range access during .EDB serialisation.
-                elevs[i] = isTerraceFloor ? 0.01 : storyHeights[i];
-
                 master[i] = true;
-
-                // [FIX-1] Pass null (not "") for master stories.
-                //         "" tells ETABS "this story is similar to the empty-
-                //         named story" which creates an invalid internal
-                //         reference.  null correctly means "no similar story".
-                similar[i] = null;
-
+                similar[i] = null;   // [FIX-1] null = no similar story
                 splice[i] = false;
                 spliceHt[i] = 0.0;
                 colors[i] = AssignColorByStoryType(storyNames[i]);
 
                 storyBaseElevations[i] = cumulativeHeight;
-                // For Terrace, internal top == base (height = 0) so no
-                // elements are placed; ETABS just gets the 0.01m nominal.
-                double actualHeight = elevs[i];
-                storyTopElevations[i] = cumulativeHeight + storyHeights[i];
                 storyNameToIndex[storyNames[i]] = i;
 
-                System.Diagnostics.Debug.WriteLine(
-                    $"Story {i}: {storyNames[i].PadRight(14)} | " +
-                    $"Base: {storyBaseElevations[i]:F3}m | " +
-                    $"Height: {storyHeights[i]:F3}m" +
-                    (isTerraceFloor ? " (Terrace=0 internal, ETABS gets 0.01m nominal)" : "") +
-                    $" | Top: {storyTopElevations[i]:F3}m");
+                if (isTerraceFloor)
+                {
+                    // ── TERRACE (v2.7) ────────────────────────────────────
+                    // The slab sits AT cumulativeHeight (= top of last real story).
+                    // storyTopElevation == storyBaseElevation so that
+                    // GetStoryHeight(i) == 0 and placementElevation = base. ✓
+                    //
+                    // ETABS receives the real parapet height so the story is
+                    // rendered at the correct level in the UI.
+                    // 0.01m crash-guard used only when user inputs 0.
+                    //
+                    // cumulativeHeight is NOT advanced — Terrace does not
+                    // contribute to the building height stack.
+                    // ─────────────────────────────────────────────────────
+                    storyTopElevations[i] = cumulativeHeight; // slab level = base
 
-                //cumulativeHeight += storyHeights[i];
-                cumulativeHeight += actualHeight;
+                    elevs[i] = storyHeights[i] > 0.0 ? storyHeights[i] : 0.01;
+                    // cumulativeHeight intentionally NOT incremented
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Story {i}: {storyNames[i].PadRight(14)} | " +
+                        $"Base (slab): {storyBaseElevations[i]:F3}m | " +
+                        $"Parapet ht : {storyHeights[i]:F3}m | " +
+                        $"ETABS ht   : {elevs[i]:F3}m | " +
+                        $"ETABS top  : {storyBaseElevations[i] + elevs[i]:F3}m");
+                }
+                else
+                {
+                    // ── NORMAL STORY ──────────────────────────────────────
+                    elevs[i] = storyHeights[i];
+                    storyTopElevations[i] = cumulativeHeight + storyHeights[i];
+                    cumulativeHeight += storyHeights[i];
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Story {i}: {storyNames[i].PadRight(14)} | " +
+                        $"Base: {storyBaseElevations[i]:F3}m | " +
+                        $"Height: {storyHeights[i]:F3}m | " +
+                        $"Top: {storyTopElevations[i]:F3}m");
+                }
             }
 
             System.Diagnostics.Debug.WriteLine(
                 $"\nTotal Building Height (incl. foundation): {cumulativeHeight:F3}m");
             System.Diagnostics.Debug.WriteLine("======================================\n");
 
-            // baseElev = foundationHeight tells ETABS where the bottom of the
-            // first defined story sits.
             int ret = sapModel.Story.SetStories_2(
                 foundationHeight,
                 numStories,
@@ -191,13 +192,7 @@ namespace ETAB_Automation.Core
                 double storedElev = 0;
                 if (sapModel.Story.GetElevation(names[i], ref storedElev) == 0)
                 {
-                    // For Terrace: ETABS reports top = base + 0.01m nominal
-                    bool isTerrace = names[i].Equals(
-                        "Terrace", StringComparison.OrdinalIgnoreCase);
-                    double expected = isTerrace
-                        ? storyBaseElevations[i] + 0.01
-                        : storyTopElevations[i];
-
+                    double expected = storyBaseElevations[i] + elevs[i];
                     double diff = Math.Abs(storedElev - expected);
                     string status = diff <= 0.011 ? "✓" : $"⚠ expected {expected:F3}m";
                     System.Diagnostics.Debug.WriteLine(
@@ -215,7 +210,7 @@ namespace ETAB_Automation.Core
         // ELEVATION ACCESSORS
         // ====================================================================
 
-        /// <summary>Base elevation of story (where its walls start).</summary>
+        /// <summary>Base elevation of story (where its slab sits).</summary>
         public double GetStoryBaseElevation(int storyIndex)
         {
             if (!storyBaseElevations.ContainsKey(storyIndex))
@@ -224,7 +219,7 @@ namespace ETAB_Automation.Core
             return storyBaseElevations[storyIndex];
         }
 
-        /// <summary>Top elevation of story (where next story begins).</summary>
+        /// <summary>Top elevation of story.</summary>
         public double GetStoryTopElevation(int storyIndex)
         {
             if (!storyTopElevations.ContainsKey(storyIndex))
@@ -236,6 +231,18 @@ namespace ETAB_Automation.Core
         /// <summary>Height of a single story in metres (top - base).</summary>
         public double GetStoryHeight(int storyIndex)
             => GetStoryTopElevation(storyIndex) - GetStoryBaseElevation(storyIndex);
+
+        /// <summary>
+        /// For Terrace: returns the user-supplied parapet height.
+        /// For all other stories: same as GetStoryHeight().
+        /// Wall importer uses this to build parapet walls above the terrace slab.
+        /// </summary>
+        public double GetTerraceParapetHeight(int storyIndex)
+        {
+            if (storyIndex >= 0 && storyIndex < storyUserHeights.Count)
+                return storyUserHeights[storyIndex];
+            return GetStoryHeight(storyIndex);
+        }
 
         // ====================================================================
         // NAME / INDEX HELPERS
@@ -273,7 +280,7 @@ namespace ETAB_Automation.Core
             if (name == "Ground") return 16776960;
             if (name == "EDeck") return 16776960;
             if (name.StartsWith("Story")) return 16711680;
-            if (name.StartsWith("Refuge")) return 16744448;  // orange
+            if (name.StartsWith("Refuge")) return 16744448;
             if (name == "Terrace") return 16711935;
             return -1;
         }
@@ -326,7 +333,8 @@ namespace ETAB_Automation.Core
             return storyIndex == 0 ? "Base" : $"Story{storyIndex + 1}";
         }
 
-        public double GetStoryElevation(int story, double storyHeight) => story * storyHeight;
+        public double GetStoryElevation(int story, double storyHeight)
+            => story * storyHeight;
 
         public double GetStoryElevationVariable(List<double> storyHeights, int storyIndex)
         {

@@ -1,10 +1,8 @@
 ﻿
+
 // ============================================================================
-// FILE: Core/CADImporterEnhanced.cs — VERSION 3.4
-// FIXES:
-//   [FIX-1] NtaWallThickness now passed to WallImporterEnhanced per floor
-//   [FIX-2] WallThicknessOverrides now passed to WallImporterEnhanced per floor
-//   [FIX-3] CalculateTotalTypicalFloors now counts Refuge floors too
+// ============================================================================
+// FILE: Core/CADImporterEnhanced.cs — VERSION 3.6
 // ============================================================================
 
 using ETAB_Automation.Models;
@@ -44,7 +42,7 @@ namespace ETAB_Automation.Core
             try
             {
                 Debug.WriteLine("\n╔════════════════════════════════════════════════════╗");
-                Debug.WriteLine("║  CAD IMPORTER v3.4 — ALL BUGS FIXED               ║");
+                Debug.WriteLine("║  CAD IMPORTER v3.6 — TERRACE GAP FIXED            ║");
                 Debug.WriteLine("╚════════════════════════════════════════════════════╝\n");
 
                 sapModel.SetModelIsLocked(false);
@@ -62,7 +60,6 @@ namespace ETAB_Automation.Core
                     return false;
                 }
 
-                // [FIX-3] Count both Typical AND Refuge floors
                 int totalTypicalFloors = CalculateTotalTypicalFloors(floorConfigs);
 
                 ShowDesignNotes(floorConfigs, totalTypicalFloors, seismicZone,
@@ -103,7 +100,6 @@ namespace ETAB_Automation.Core
                             return false;
                         }
 
-                        // [FIX-1][FIX-2] Pass NTA thickness and wall overrides for foundation
                         var foundationWallImporter = new WallImporterEnhanced(
                             sapModel,
                             foundationDxf,
@@ -172,7 +168,6 @@ namespace ETAB_Automation.Core
 
                         double baseElevation = storyManager.GetStoryBaseElevation(currentStoryIndex);
                         double topElevation = storyManager.GetStoryTopElevation(currentStoryIndex);
-                        double thisFloorHeight = topElevation - baseElevation;
 
                         string wallGrade = gradeSchedule.GetWallGrade(currentStoryIndex);
                         string beamSlabGrade = gradeSchedule.GetBeamSlabGrade(currentStoryIndex);
@@ -180,23 +175,37 @@ namespace ETAB_Automation.Core
                         bool isTerraceStory = storyNames[currentStoryIndex]
                             .Equals("Terrace", StringComparison.OrdinalIgnoreCase);
 
-                        double placementElevation = isTerraceStory
-                            ? storyManager.GetETABSStoryElevation(storyNames[currentStoryIndex])
-                            : baseElevation;
+                        // ── FLOOR HEIGHT FOR WALL IMPORTER (v3.6) ────────────
+                        // Normal stories : walls span baseElevation → topElevation
+                        //                  height = topElevation - baseElevation  ✓
+                        //
+                        // Terrace        : storyTopElevations == storyBaseElevations
+                        //                  so (top - base) == 0 — walls would be flat!
+                        //                  Instead use GetTerraceParapetHeight() which
+                        //                  returns the user-supplied parapet height so
+                        //                  parapet walls span base → base + parapetHt ✓
+                        // ─────────────────────────────────────────────────────
+                        double thisFloorHeight = isTerraceStory
+                            ? storyManager.GetTerraceParapetHeight(currentStoryIndex)
+                            : topElevation - baseElevation;
+
+                        // ALL stories place elements at baseElevation.
+                        // For Terrace: baseElevation == top of last real story ✓
+                        double placementElevation = baseElevation;
 
                         Debug.WriteLine($"\n   [{floor + 1}/{floorConfig.Count}] " +
                                         $"{storyNames[currentStoryIndex]} (idx {currentStoryIndex})");
-                        Debug.WriteLine($"       Grade      : Wall={wallGrade}, Beam/Slab={beamSlabGrade}");
-                        Debug.WriteLine($"       Base       : {baseElevation:F3}m");
-                        Debug.WriteLine($"       Top        : {topElevation:F3}m");
-                        Debug.WriteLine($"       Height     : {thisFloorHeight:F3}m");
-                        Debug.WriteLine($"       IsTerrace  : {isTerraceStory}");
-                        Debug.WriteLine($"       NTA wall   : {floorConfig.NtaWallThickness}mm");
+                        Debug.WriteLine($"       Grade       : Wall={wallGrade}, Beam/Slab={beamSlabGrade}");
+                        Debug.WriteLine($"       Base        : {baseElevation:F3}m");
+                        Debug.WriteLine($"       Top         : {topElevation:F3}m");
+                        Debug.WriteLine($"       Floor height: {thisFloorHeight:F3}m" +
+                                        (isTerraceStory ? " (parapet height)" : ""));
+                        Debug.WriteLine($"       Placement   : {placementElevation:F3}m");
+                        Debug.WriteLine($"       NTA wall    : {floorConfig.NtaWallThickness}mm");
 
-                        // [FIX-1][FIX-2] Pass NTA thickness and wall overrides per floor
                         var wallImporter = new WallImporterEnhanced(
                             sapModel, dxfDoc,
-                            thisFloorHeight,
+                            thisFloorHeight,   // parapet height for Terrace, normal height otherwise
                             totalTypicalFloors > 0 ? totalTypicalFloors : totalStories,
                             seismicZone,
                             gradeSchedule,
@@ -251,12 +260,6 @@ namespace ETAB_Automation.Core
         // HELPERS
         // ====================================================================
 
-        /// <summary>
-        /// [FIX-3] Count Typical AND Refuge floors (both share the typical
-        /// floor plan and height).  Previously only "Typical" was counted,
-        /// returning 0 when all typical slots were replaced by Refuge, which
-        /// caused the wrong total to be passed to GPL wall-thickness lookups.
-        /// </summary>
         private int CalculateTotalTypicalFloors(List<FloorTypeConfig> configs)
         {
             int total = 0;
