@@ -1,10 +1,21 @@
 ﻿
+
 // ============================================================================
 // FILE: Importers/BeamImporterEnhanced.cs
-
+// ============================================================================
+// BEAMS  → Assign > Frame Loads > Distributed  → Load PATTERN
+// API    : sapModel.FrameObj.SetLoadDistributed(name, patternName, ...)
+// Cache  : sapModel.LoadPatterns.GetNameList()
+//
+// Flow per beam layer:
+//   1. DetermineBeamSection()  → picks section name + loadSetKey from layer name
+//   2. ResolveBeamLoadSetName()→ reads UI value (beamWallLoadSets[key])
+//   3. ResolveLoadPattern()    → fuzzy-matches that name against ETABS patterns
+//   4. AssignBeamWallLoads()   → calls SetLoadDistributed if pattern found
 // ============================================================================
 
 using ETAB_Automation.Core;
+using ETAB_Automation.Models;
 using ETABSv1;
 using netDxf;
 using netDxf.Entities;
@@ -23,6 +34,7 @@ namespace ETABS_CAD_Automation.Importers
         private readonly int totalTypicalFloors;
         private readonly Dictionary<string, int> beamDepths;
         private readonly Dictionary<string, int> beamWidthOverrides;
+        private readonly Dictionary<string, string> beamWallLoadSets; // from UI
         private readonly GradeScheduleManager gradeSchedule;
 
         private const double X_TO_M = 0.001;
@@ -31,13 +43,14 @@ namespace ETABS_CAD_Automation.Importers
         private double MY(double y) => y * Y_TO_M;
 
         // ====================================================================
-        // SECTION CACHE
+        // SECTION CACHE  (static — populated once per process lifetime)
         // ====================================================================
 
-        private static Dictionary<string, GravityBeamInfo> gravityBeamSections =
-            new Dictionary<string, GravityBeamInfo>();
-        private static Dictionary<string, MainBeamInfo> mainBeamSections =
-            new Dictionary<string, MainBeamInfo>();
+        private static readonly Dictionary<string, GravityBeamInfo> gravityBeamSections
+            = new Dictionary<string, GravityBeamInfo>();
+
+        private static readonly Dictionary<string, MainBeamInfo> mainBeamSections
+            = new Dictionary<string, MainBeamInfo>();
 
         private class GravityBeamInfo
         {
@@ -56,6 +69,14 @@ namespace ETABS_CAD_Automation.Importers
         }
 
         // ====================================================================
+        // LOAD PATTERN CACHE  (instance — re-read for every new model/session)
+        // Key   = UPPER-CASE pattern name
+        // Value = exact name stored in ETABS  (case-sensitive)
+        // ====================================================================
+
+        private Dictionary<string, string> etabsLoadPatterns;
+
+        // ====================================================================
         // CONSTRUCTOR
         // ====================================================================
 
@@ -66,7 +87,8 @@ namespace ETABS_CAD_Automation.Importers
             int typicalFloors,
             Dictionary<string, int> depths,
             GradeScheduleManager gradeManager = null,
-            Dictionary<string, int> widthOverrides = null)
+            Dictionary<string, int> widthOverrides = null,
+            Dictionary<string, string> wallLoadSets = null)
         {
             sapModel = model;
             dxfDoc = doc;
@@ -75,12 +97,84 @@ namespace ETABS_CAD_Automation.Importers
             beamDepths = depths ?? new Dictionary<string, int>();
             gradeSchedule = gradeManager;
             beamWidthOverrides = widthOverrides ?? new Dictionary<string, int>();
+            beamWallLoadSets = wallLoadSets ?? new Dictionary<string, string>();
 
             LoadBeamSections();
+            LoadEtabsLoadPatterns();
+        }
+
+        // ====================================================================
+        // STEP 1 — Discover all ETABS Load Patterns
+        // Logged in full so any mismatch is immediately visible.
+        // ====================================================================
+
+        private void LoadEtabsLoadPatterns()
+        {
+            etabsLoadPatterns = new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                int n = 0;
+                string[] names = null;
+                int ret = sapModel.LoadPatterns.GetNameList(ref n, ref names);
+
+                if (ret != 0 || names == null || n == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        "⚠ BEAM: Could not read Load Patterns from ETABS model.");
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"\n===== ETABS LOAD PATTERNS (for BEAM assignment) — {n} total =====");
+                foreach (string name in names)
+                {
+                    etabsLoadPatterns[name.ToUpperInvariant()] = name;
+                    System.Diagnostics.Debug.WriteLine($"  LP: '{name}'");
+                }
+                System.Diagnostics.Debug.WriteLine(
+                    "====================================================================\n");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"⚠ BEAM LoadEtabsLoadPatterns: {ex.Message}");
+            }
+        }
+
+        // ====================================================================
+        // STEP 2 — Fuzzy-resolve user name → exact ETABS Load Pattern name
+        // 1. Exact match (case-insensitive)
+        // 2. Substring match (user in pattern OR pattern in user)
+        // Returns null if nothing matches → caller skips assignment.
+        // ====================================================================
+
+        private string ResolveLoadPattern(string userPatternName)
+        {
+            if (string.IsNullOrWhiteSpace(userPatternName)) return null;
+            if (etabsLoadPatterns == null || etabsLoadPatterns.Count == 0) return null;
+
+            string u = userPatternName.ToUpperInvariant().Trim();
+
+            // 1. Exact
+            if (etabsLoadPatterns.TryGetValue(u, out string exact)) return exact;
+
+            // 2. Partial
+            foreach (var kv in etabsLoadPatterns)
+                if (kv.Key.Contains(u) || u.Contains(kv.Key))
+                    return kv.Value;
+
+            System.Diagnostics.Debug.WriteLine(
+                $"  ⚠ BEAM: Load Pattern '{userPatternName}' not found in ETABS. " +
+                "Check Define > Load Patterns — names are listed above.");
+            return null;
         }
 
         // ====================================================================
         // SECTION LOADING
+        // Pattern: B20X75M35  (gravity) | MB25X75M35 (main)
+        // Groups : width-in-cm  × depth-in-cm  grade-number
         // ====================================================================
 
         private void LoadBeamSections()
@@ -96,9 +190,11 @@ namespace ETABS_CAD_Automation.Importers
                 int ret = sapModel.PropFrame.GetNameList(ref n, ref names);
                 if (ret != 0 || names == null) return;
 
-                var mainPat = new Regex(@"^MB(\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)M(\d+)",
+                var mainPat = new Regex(
+                    @"^MB(\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)M(\d+)",
                     RegexOptions.IgnoreCase);
-                var gravPat = new Regex(@"^B(\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)M(\d+)",
+                var gravPat = new Regex(
+                    @"^B(\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)M(\d+)",
                     RegexOptions.IgnoreCase);
 
                 foreach (string name in names)
@@ -115,7 +211,6 @@ namespace ETABS_CAD_Automation.Importers
                         };
                         continue;
                     }
-
                     var gg = gravPat.Match(name);
                     if (gg.Success)
                     {
@@ -136,7 +231,7 @@ namespace ETABS_CAD_Automation.Importers
                 if (gravityBeamSections.Count == 0 && mainBeamSections.Count == 0)
                     throw new InvalidOperationException(
                         "No beam sections found in ETABS template.\n" +
-                        "Expected format: B20X75M35 (gravity) and MB25X75M35 (main).");
+                        "Expected format: B20X75M35 (gravity) / MB25X75M35 (main).");
             }
             catch (Exception ex)
             {
@@ -146,20 +241,22 @@ namespace ETABS_CAD_Automation.Importers
         }
 
         // ====================================================================
-        // WIDTH RESOLUTION HELPERS
+        // WIDTH HELPERS
         // ====================================================================
 
-        private int GravityBeamWidth()
+        private int ResolveGravityWidth(string variantKey)
         {
-            int ovr = beamWidthOverrides.GetValueOrDefault("GravityWidth", 0);
-            if (ovr > 0) return ovr;
+            // 1. Per-variant override from UI
+            if (beamWidthOverrides.TryGetValue(variantKey, out int v) && v > 0) return v;
+            // 2. Shared gravity override (legacy)
+            if (beamWidthOverrides.TryGetValue("GravityWidth", out int s) && s > 0) return s;
+            // 3. Zone rule
             return (seismicZone.Contains("II") || seismicZone.Contains("III")) ? 200 : 240;
         }
 
-        private int MainBeamWidth(WallThicknessCalculator.WallType wt, string widthOverrideKey)
+        private int ResolveMainWidth(WallThicknessCalculator.WallType wt, string key)
         {
-            int ovr = beamWidthOverrides.GetValueOrDefault(widthOverrideKey, 0);
-            if (ovr > 0) return ovr;
+            if (beamWidthOverrides.TryGetValue(key, out int v) && v > 0) return v;
             return WallThicknessCalculator.GetRecommendedThickness(
                 totalTypicalFloors, wt, seismicZone, 2.0, false);
         }
@@ -170,48 +267,48 @@ namespace ETABS_CAD_Automation.Importers
 
         private string BestGravitySection(int reqWidth, int reqDepth, string grade)
         {
-            string gradeNum = NormalizeGrade(grade);
-            string best = null;
-            int minDiff = int.MaxValue;
+            string gn = NormalizeGrade(grade);
+            string best = null; int minDiff = int.MaxValue;
 
-            if (!string.IsNullOrEmpty(gradeNum))
+            // Try grade-specific first
+            if (!string.IsNullOrEmpty(gn))
             {
                 foreach (var kvp in gravityBeamSections)
                 {
-                    if (kvp.Value.Grade != gradeNum) continue;
-                    int diff = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
-                             + Math.Abs(kvp.Value.WidthMm - reqWidth);
-                    if (diff < minDiff) { minDiff = diff; best = kvp.Key; }
+                    if (kvp.Value.Grade != gn) continue;
+                    int d = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
+                          + Math.Abs(kvp.Value.WidthMm - reqWidth);
+                    if (d < minDiff) { minDiff = d; best = kvp.Key; }
                 }
                 if (best != null) return best;
             }
 
+            // Grade-agnostic fallback
             minDiff = int.MaxValue;
             foreach (var kvp in gravityBeamSections)
             {
-                int diff = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
-                         + Math.Abs(kvp.Value.WidthMm - reqWidth);
-                if (diff < minDiff) { minDiff = diff; best = kvp.Key; }
+                int d = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
+                      + Math.Abs(kvp.Value.WidthMm - reqWidth);
+                if (d < minDiff) { minDiff = d; best = kvp.Key; }
             }
 
             return best ?? throw new InvalidOperationException(
-                $"No gravity beam section (B__) for {reqWidth}×{reqDepth}mm.");
+                $"No gravity beam section (B__) found for {reqWidth}×{reqDepth}mm.");
         }
 
         private string BestMainSection(int reqWidth, int reqDepth, string grade)
         {
-            string gradeNum = NormalizeGrade(grade);
-            string best = null;
-            int minDiff = int.MaxValue;
+            string gn = NormalizeGrade(grade);
+            string best = null; int minDiff = int.MaxValue;
 
-            if (!string.IsNullOrEmpty(gradeNum))
+            if (!string.IsNullOrEmpty(gn))
             {
                 foreach (var kvp in mainBeamSections)
                 {
-                    if (kvp.Value.Grade != gradeNum) continue;
-                    int diff = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
-                             + Math.Abs(kvp.Value.WidthMm - reqWidth);
-                    if (diff < minDiff) { minDiff = diff; best = kvp.Key; }
+                    if (kvp.Value.Grade != gn) continue;
+                    int d = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
+                          + Math.Abs(kvp.Value.WidthMm - reqWidth);
+                    if (d < minDiff) { minDiff = d; best = kvp.Key; }
                 }
                 if (best != null) return best;
             }
@@ -219,106 +316,129 @@ namespace ETABS_CAD_Automation.Importers
             minDiff = int.MaxValue;
             foreach (var kvp in mainBeamSections)
             {
-                int diff = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
-                         + Math.Abs(kvp.Value.WidthMm - reqWidth);
-                if (diff < minDiff) { minDiff = diff; best = kvp.Key; }
+                int d = Math.Abs(kvp.Value.DepthMm - reqDepth) * 2
+                      + Math.Abs(kvp.Value.WidthMm - reqWidth);
+                if (d < minDiff) { minDiff = d; best = kvp.Key; }
             }
 
             if (best == null && gravityBeamSections.Count > 0)
             {
                 System.Diagnostics.Debug.WriteLine(
-                    "⚠ No MB sections — falling back to gravity sections for main beam");
+                    "⚠ No MB__ sections — falling back to gravity (B__) for main beam");
                 return BestGravitySection(reqWidth, reqDepth, grade);
             }
 
             return best ?? throw new InvalidOperationException(
-                $"No main beam section (MB__) for {reqWidth}×{reqDepth}mm.");
+                $"No main beam section (MB__) found for {reqWidth}×{reqDepth}mm.");
         }
 
         private static string NormalizeGrade(string grade)
             => grade?.Replace("M", "").Replace("m", "").Trim();
 
         // ====================================================================
-        // LAYER → SECTION MAPPING
+        // LAYER → SECTION + LOAD-SET KEY
+        // Returns (sectionName, loadSetKey, category)
+        // loadSetKey is used to look up the user-typed load pattern name.
         // ====================================================================
 
         private enum BeamCategory { Gravity, Main }
 
-        private (string section, BeamCategory cat) DetermineBeamSection(
-            string layerName, string grade)
+        private (string section, string loadSetKey, BeamCategory cat)
+            DetermineBeamSection(string layerName, string grade)
         {
             string u = layerName.ToUpperInvariant();
-            int gw = GravityBeamWidth();
 
-            // ── MAIN BEAMS ────────────────────────────────────────────────
+            // ── MAIN BEAMS ─────────────────────────────────────────────────
             if (u.Contains("CORE") && u.Contains("MAIN"))
             {
-                int w = MainBeamWidth(WallThicknessCalculator.WallType.CoreWall, "CoreMainWidth");
-                return (BestMainSection(w,
-                    beamDepths.GetValueOrDefault("CoreMain", 600), grade), BeamCategory.Main);
+                int w = ResolveMainWidth(WallThicknessCalculator.WallType.CoreWall, "CoreMainWidth");
+                return (BestMainSection(w, beamDepths.GetValueOrDefault("CoreMain", 600), grade),
+                        "CoreMain", BeamCategory.Main);
             }
-
             if (u.Contains("PERIPHERAL") && u.Contains("DEAD") && u.Contains("MAIN"))
             {
-                int w = MainBeamWidth(WallThicknessCalculator.WallType.PeripheralDeadWall,
-                                      "PeripheralDeadMainWidth");
-                return (BestMainSection(w,
-                    beamDepths.GetValueOrDefault("PeripheralDeadMain", 600), grade), BeamCategory.Main);
+                int w = ResolveMainWidth(WallThicknessCalculator.WallType.PeripheralDeadWall, "PeripheralDeadMainWidth");
+                return (BestMainSection(w, beamDepths.GetValueOrDefault("PeripheralDeadMain", 600), grade),
+                        "PeripheralDeadMain", BeamCategory.Main);
             }
-
             if (u.Contains("PERIPHERAL") && u.Contains("PORTAL") && u.Contains("MAIN"))
             {
-                int w = MainBeamWidth(WallThicknessCalculator.WallType.PeripheralPortalWall,
-                                      "PeripheralPortalMainWidth");
-                return (BestMainSection(w,
-                    beamDepths.GetValueOrDefault("PeripheralPortalMain", 650), grade), BeamCategory.Main);
+                int w = ResolveMainWidth(WallThicknessCalculator.WallType.PeripheralPortalWall, "PeripheralPortalMainWidth");
+                return (BestMainSection(w, beamDepths.GetValueOrDefault("PeripheralPortalMain", 650), grade),
+                        "PeripheralPortalMain", BeamCategory.Main);
             }
-
             if (u.Contains("INTERNAL") && u.Contains("MAIN"))
             {
-                int w = MainBeamWidth(WallThicknessCalculator.WallType.InternalWall, "InternalMainWidth");
-                return (BestMainSection(w,
-                    beamDepths.GetValueOrDefault("InternalMain", 550), grade), BeamCategory.Main);
+                int w = ResolveMainWidth(WallThicknessCalculator.WallType.InternalWall, "InternalMainWidth");
+                return (BestMainSection(w, beamDepths.GetValueOrDefault("InternalMain", 550), grade),
+                        "InternalMain", BeamCategory.Main);
             }
 
-            // ── GRAVITY BEAMS ─────────────────────────────────────────────
-            if (u.Contains("CANTILEVER") && u.Contains("GRAVITY"))
-                return (BestGravitySection(gw,
-                    beamDepths.GetValueOrDefault("CantileverGravity", 500), grade), BeamCategory.Gravity);
+            // ── GRAVITY BEAMS ──────────────────────────────────────────────
 
+            // NoLoad must be checked BEFORE generic gravity matches
             if (u.Contains("NO LOAD") || u.Contains("NOLOAD") || u.Contains("NO-LOAD"))
-                return (BestGravitySection(gw,
-                    beamDepths.GetValueOrDefault("NoLoadGravity",
-                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade), BeamCategory.Gravity);
-
+            {
+                int w = ResolveGravityWidth("NoLoadGravityWidth");
+                return (BestGravitySection(w,
+                        beamDepths.GetValueOrDefault("NoLoadGravity",
+                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade),
+                        "NoLoadGravity",     // → empty string in load set table
+                        BeamCategory.Gravity);
+            }
+            if (u.Contains("CANTILEVER") && u.Contains("GRAVITY"))
+            {
+                int w = ResolveGravityWidth("CantileverGravityWidth");
+                return (BestGravitySection(w, beamDepths.GetValueOrDefault("CantileverGravity", 500), grade),
+                        "CantileverGravity", BeamCategory.Gravity);
+            }
             if (u.Contains("EDECK") || u.Contains("E-DECK") || u.Contains("E DECK"))
-                return (BestGravitySection(gw,
-                    beamDepths.GetValueOrDefault("EdeckGravity",
-                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade), BeamCategory.Gravity);
-
+            {
+                int w = ResolveGravityWidth("EdeckGravityWidth");
+                return (BestGravitySection(w,
+                        beamDepths.GetValueOrDefault("EdeckGravity",
+                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade),
+                        "EdeckGravity", BeamCategory.Gravity);
+            }
             if (u.Contains("PODIUM"))
-                return (BestGravitySection(gw,
-                    beamDepths.GetValueOrDefault("PodiumGravity",
-                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade), BeamCategory.Gravity);
-
+            {
+                int w = ResolveGravityWidth("PodiumGravityWidth");
+                return (BestGravitySection(w,
+                        beamDepths.GetValueOrDefault("PodiumGravity",
+                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade),
+                        "PodiumGravity", BeamCategory.Gravity);
+            }
             if (u.Contains("GROUND"))
-                return (BestGravitySection(gw,
-                    beamDepths.GetValueOrDefault("GroundGravity",
-                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade), BeamCategory.Gravity);
-
+            {
+                int w = ResolveGravityWidth("GroundGravityWidth");
+                return (BestGravitySection(w,
+                        beamDepths.GetValueOrDefault("GroundGravity",
+                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade),
+                        "GroundGravity", BeamCategory.Gravity);
+            }
             if (u.Contains("BASEMENT"))
-                return (BestGravitySection(gw,
-                    beamDepths.GetValueOrDefault("BasementGravity",
-                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade), BeamCategory.Gravity);
-
+            {
+                int w = ResolveGravityWidth("BasementGravityWidth");
+                return (BestGravitySection(w,
+                        beamDepths.GetValueOrDefault("BasementGravity",
+                        beamDepths.GetValueOrDefault("InternalGravity", 450)), grade),
+                        "BasementGravity", BeamCategory.Gravity);
+            }
             if (u.Contains("INTERNAL") && u.Contains("GRAVITY"))
-                return (BestGravitySection(gw,
-                    beamDepths.GetValueOrDefault("InternalGravity", 450), grade), BeamCategory.Gravity);
+            {
+                int w = ResolveGravityWidth("InternalGravityWidth");
+                return (BestGravitySection(w, beamDepths.GetValueOrDefault("InternalGravity", 450), grade),
+                        "InternalGravity", BeamCategory.Gravity);
+            }
 
+            // Unknown → InternalGravity fallback
             System.Diagnostics.Debug.WriteLine(
-                $"⚠ Unknown beam layer '{layerName}' → internal gravity fallback");
-            return (BestGravitySection(gw,
-                beamDepths.GetValueOrDefault("InternalGravity", 450), grade), BeamCategory.Gravity);
+                $"  ⚠ Unknown beam layer '{layerName}' → InternalGravity fallback");
+            {
+                int w = ResolveGravityWidth("InternalGravityWidth");
+                return (BestGravitySection(w, beamDepths.GetValueOrDefault("InternalGravity", 450), grade),
+                        "InternalGravity", BeamCategory.Gravity);
+            }
         }
 
         // ====================================================================
@@ -338,101 +458,193 @@ namespace ETABS_CAD_Automation.Importers
             string beamGrade = gradeSchedule?.GetBeamSlabGradeForStory(story);
 
             System.Diagnostics.Debug.WriteLine(
-                $"\n========== IMPORTING BEAMS - Story {story} ==========");
-            System.Diagnostics.Debug.WriteLine(
-                $"Zone: {seismicZone}  |  Gravity width: {GravityBeamWidth()}mm  |  " +
-                $"Grade: {beamGrade ?? "template default"}  |  Elev: {elevation:F3}m");
-
-            if (beamWidthOverrides.Any(kv => kv.Value > 0))
-            {
-                System.Diagnostics.Debug.WriteLine("  Width overrides active:");
-                foreach (var kv in beamWidthOverrides.Where(kv => kv.Value > 0))
-                    System.Diagnostics.Debug.WriteLine($"    {kv.Key} = {kv.Value}mm");
-            }
+                $"\n========== IMPORTING BEAMS — Story {story} | Elev {elevation:F3}m | Grade {beamGrade ?? "default"} ==========");
 
             int total = 0;
 
             foreach (string layerName in beamLayers)
             {
-                var (section, cat) = DetermineBeamSection(layerName, beamGrade);
+                var (section, loadSetKey, cat) = DetermineBeamSection(layerName, beamGrade);
+
+                var createdNames = new List<string>();
                 int cnt = 0;
 
-                System.Diagnostics.Debug.WriteLine($"\nLayer: {layerName} [{cat}] → {section}");
+                System.Diagnostics.Debug.WriteLine(
+                    $"\n  Layer: '{layerName}' [{cat}] → section='{section}' loadKey='{loadSetKey}'");
 
+                // ── Geometry creation ──────────────────────────────────────
                 foreach (var line in dxfDoc.Entities.Lines
                     .Where(l => l.Layer.Name == layerName))
                 {
-                    CreateBeamFromLine(line, elevation, section, story);
-                    cnt++;
+                    string nm = CreateBeamFromLine(line, elevation, section, story);
+                    if (!string.IsNullOrEmpty(nm)) { createdNames.Add(nm); cnt++; }
                 }
 
                 foreach (var poly in dxfDoc.Entities.Polylines2D
                     .Where(p => p.Layer.Name == layerName))
-                    cnt += CreateBeamFromPolyline(poly, elevation, section, story);
+                {
+                    var nms = CreateBeamFromPolyline(poly, elevation, section, story);
+                    createdNames.AddRange(nms);
+                    cnt += nms.Count;
+                }
 
-                System.Diagnostics.Debug.WriteLine($"  ✓ {cnt} beam(s)");
+                System.Diagnostics.Debug.WriteLine($"  Created: {cnt} beam(s)");
+
+                // ── Load assignment ────────────────────────────────────────
+                if (createdNames.Count > 0)
+                {
+                    // Get the user-typed Load Pattern name for this beam type
+                    string userPatternName = GetBeamLoadPatternName(loadSetKey);
+                    AssignBeamWallLoads(createdNames, userPatternName, loadSetKey);
+                }
+
                 total += cnt;
             }
 
-            System.Diagnostics.Debug.WriteLine($"\nTotal beams this story: {total}");
+            System.Diagnostics.Debug.WriteLine(
+                $"\n  Total beams story {story}: {total}\n");
+        }
+
+        // ====================================================================
+        // GET BEAM LOAD PATTERN NAME FROM UI
+        // Priority: (1) UI beamWallLoadSets dict  (2) FloorTypeConfig defaults
+        // NoLoadGravity always returns empty → no load assigned.
+        // ====================================================================
+
+        private string GetBeamLoadPatternName(string loadSetKey)
+        {
+            // NoLoadGravity: explicitly no wall load
+            if (loadSetKey == "NoLoadGravity") return string.Empty;
+
+            // UI value (from constructor param, read from UI TextBox)
+            if (beamWallLoadSets.TryGetValue(loadSetKey, out string uiVal)
+                && !string.IsNullOrWhiteSpace(uiVal))
+                return uiVal.Trim();
+
+            // Static default fallback
+            if (FloorTypeConfig.DefaultBeamWallLoadSets.TryGetValue(loadSetKey, out string def)
+                && !string.IsNullOrWhiteSpace(def))
+                return def.Trim();
+
+            return string.Empty;
+        }
+
+        // ====================================================================
+        // ASSIGN BEAM WALL LOADS via SetLoadDistributed (Load Pattern)
+        // ====================================================================
+
+        private void AssignBeamWallLoads(List<string> frameNames,
+            string userPatternName, string loadSetKey)
+        {
+            // Empty → intentional (NoLoad or user left it blank)
+            if (string.IsNullOrWhiteSpace(userPatternName))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"  ⊘ No wall load for '{loadSetKey}' — skipping (intentional).");
+                return;
+            }
+
+            // Resolve → exact ETABS Load Pattern name
+            string patternName = ResolveLoadPattern(userPatternName);
+            if (patternName == null)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"  ⚠ Load Pattern '{userPatternName}' (key='{loadSetKey}') not found in ETABS. " +
+                    "Skipping. Fix in Define > Load Patterns and re-run.");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine(
+                $"  → Assigning Load Pattern '{patternName}' to {frameNames.Count} beam(s)");
+
+            int ok = 0, fail = 0;
+            foreach (string name in frameNames)
+            {
+                try
+                {
+                    int ret = sapModel.FrameObj.SetLoadDistributed(
+                        name,
+                        patternName,  // exact ETABS Load Pattern
+                        1,            // MyType  : 1 = Force
+                        6,            // Dir     : 6 = Gravity (global -Z)
+                        0.0,          // Dist1   : relative start  (0.0 = End-I)
+                        1.0,          // Dist2   : relative end    (1.0 = End-J)
+                        1.0,          // Val1    : value at start  (kN/m — pattern carries actual magnitude)
+                        1.0,          // Val2    : value at end
+                        "Global",
+                        true,         // RelDist : true = relative distances
+                        true);        // Replace : true = replace existing load
+
+                    if (ret == 0) ok++;
+                    else
+                    {
+                        fail++;
+                        System.Diagnostics.Debug.WriteLine(
+                            $"    ⚠ SetLoadDistributed ret={ret} for beam '{name}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    fail++;
+                    System.Diagnostics.Debug.WriteLine(
+                        $"    ⚠ SetLoadDistributed exception for '{name}': {ex.Message}");
+                }
+            }
+            System.Diagnostics.Debug.WriteLine(
+                $"  Load Pattern '{patternName}': ✓{ok} assigned  ✗{fail} failed");
         }
 
         // ====================================================================
         // GEOMETRY CREATION
         // ====================================================================
 
-        private void CreateBeamFromLine(netDxf.Entities.Line line,
+        private string CreateBeamFromLine(netDxf.Entities.Line line,
             double elevation, string section, int story)
         {
             string name = "";
-            sapModel.FrameObj.AddByCoord(
+            int ret = sapModel.FrameObj.AddByCoord(
                 MX(line.StartPoint.X), MY(line.StartPoint.Y), elevation,
                 MX(line.EndPoint.X), MY(line.EndPoint.Y), elevation,
                 ref name, section, GetStoryName(story));
+            return (ret == 0 && !string.IsNullOrEmpty(name)) ? name : null;
         }
 
-        private int CreateBeamFromPolyline(Polyline2D poly,
+        private List<string> CreateBeamFromPolyline(Polyline2D poly,
             double elevation, string section, int story)
         {
             string storyName = GetStoryName(story);
             var verts = poly.Vertexes;
-            int cnt = 0;
+            var names = new List<string>();
 
             for (int i = 0; i < verts.Count - 1; i++)
             {
                 string name = "";
-                sapModel.FrameObj.AddByCoord(
+                int ret = sapModel.FrameObj.AddByCoord(
                     MX(verts[i].Position.X), MY(verts[i].Position.Y), elevation,
                     MX(verts[i + 1].Position.X), MY(verts[i + 1].Position.Y), elevation,
                     ref name, section, storyName);
-                cnt++;
+                if (ret == 0 && !string.IsNullOrEmpty(name)) names.Add(name);
             }
 
             if (poly.IsClosed && verts.Count > 2)
             {
                 string name = "";
-                sapModel.FrameObj.AddByCoord(
+                int ret = sapModel.FrameObj.AddByCoord(
                     MX(verts[verts.Count - 1].Position.X),
                     MY(verts[verts.Count - 1].Position.Y), elevation,
-                    MX(verts[0].Position.X), MY(verts[0].Position.Y), elevation,
+                    MX(verts[0].Position.X),
+                    MY(verts[0].Position.Y), elevation,
                     ref name, section, storyName);
-                cnt++;
+                if (ret == 0 && !string.IsNullOrEmpty(name)) names.Add(name);
             }
 
-            return cnt;
+            return names;
         }
 
         // ====================================================================
-        // [FIX-1] GetStoryName — flip ETABS top-down index to bottom-up
+        // STORY NAME — ETABS GetNameList is TOP-DOWN; our index is BOTTOM-UP
         // ====================================================================
 
-        /// <summary>
-        /// ETABS Story.GetNameList returns stories ordered TOP-DOWN
-        /// (index 0 = topmost story, e.g. Terrace).
-        /// Our <paramref name="story"/> parameter is BOTTOM-UP
-        /// (0 = lowest floor, e.g. Basement1).
-        /// Flip formula: names[n - 1 - story]
-        /// </summary>
         private string GetStoryName(int story)
         {
             try
@@ -440,7 +652,7 @@ namespace ETABS_CAD_Automation.Importers
                 int n = 0; string[] names = null;
                 if (sapModel.Story.GetNameList(ref n, ref names) == 0 &&
                     names != null && story >= 0 && story < n)
-                    return names[n - 1 - story];   // [FIX-1] correct flip
+                    return names[n - 1 - story];   // flip: 0=bottom → last entry
             }
             catch { }
             return story == 0 ? "Base" : $"Story{story + 1}";
@@ -448,7 +660,7 @@ namespace ETABS_CAD_Automation.Importers
     }
 
     // ====================================================================
-    // EXTENSION HELPER
+    // DICT EXTENSION HELPER
     // ====================================================================
 
     internal static class DictExtensions

@@ -125,7 +125,7 @@ namespace ETAB_Automation.Core
                 HandleETABSLogin();
 
                 Thread.Sleep(5000);
-
+                //ETAB_Automation.Debug.DumpEtabsApi.Run(SapModel);
                 return true;
             }
             catch (Exception ex)

@@ -1080,7 +1080,7 @@ namespace ETAB_Automation
             chkTerrace = AddCheckBox(grpTr, "Include Terrace Floor", 15, 25);
             chkTerrace.CheckedChanged += ChkTerrace_CheckedChanged;
             AddLabel(grpTr, "Terrace Height (m):", 35, 52, 150, 20);
-            numTerraceheight = AddNumericCtrl(grpTr, 190, 50, 0.0M, 5.0M, 0.0M, decimals: 2, enabled: false);
+            numTerraceheight = AddNumericCtrl(grpTr, 190, 50, 3.0M, 5.0M, 10.0M, decimals: 2, enabled: false);
             AddLabel(grpTr, "(0 = reference level only)", 285, 52, 300, 20,
                 italic: true, color: System.Drawing.Color.Gray);
             y += 92;
