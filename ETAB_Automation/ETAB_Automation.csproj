@@ -22,9 +22,7 @@
 	<ItemGroup>
 
 		<!-- Main form file — stays as-is; owns the .resx resource -->
-		<Compile Update="UI\ImportConfigForm.cs">
-			<SubType>Form</SubType>
-		</Compile>
+		<Compile Update="UI\ImportConfigForm.cs" />
 
 		<!-- Designer / generated code — if you have one -->
 		<Compile Update="UI\ImportConfigForm.Designer.cs">
@@ -39,9 +37,6 @@
 		</Compile>
 
 		<!-- Resource file — only ONE, owned by the main form file -->
-		<EmbeddedResource Update="UI\ImportConfigForm.resx">
-			<DependentUpon>ImportConfigForm.cs</DependentUpon>
-		</EmbeddedResource>
 
 	</ItemGroup>
 

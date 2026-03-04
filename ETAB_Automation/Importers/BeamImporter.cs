@@ -566,11 +566,11 @@ namespace ETABS_CAD_Automation.Importers
                         name,
                         patternName,  // exact ETABS Load Pattern
                         1,            // MyType  : 1 = Force
-                        6,            // Dir     : 6 = Gravity (global -Z)
+                        4,            // Dir     : 6 = Gravity (global -Z, downward)
                         0.0,          // Dist1   : relative start  (0.0 = End-I)
                         1.0,          // Dist2   : relative end    (1.0 = End-J)
-                        1.0,          // Val1    : value at start  (kN/m — pattern carries actual magnitude)
-                        1.0,          // Val2    : value at end
+                        6000.0,          // Val1    : 6 kN/m at start (downward — gravity dir = positive)
+                        6000.0,          // Val2    : 6 kN/m at end
                         "Global",
                         true,         // RelDist : true = relative distances
                         true);        // Replace : true = replace existing load

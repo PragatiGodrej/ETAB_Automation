@@ -23,7 +23,7 @@ namespace ETAB_Automation.Models
         public bool IsIndividualPodium { get; set; } = false;
         public int PodiumNumber { get; set; } = 0;
 
-        
+
         // ── Layer mapping: layer name → "Beam" / "Wall" / "Slab" / "Column"
         public Dictionary<string, string> LayerMapping { get; set; }
             = new Dictionary<string, string>();
@@ -74,6 +74,20 @@ namespace ETAB_Automation.Models
         // Keys: Lobby, Stair, FireTender, OHT, TerraceFire,
         //       UGT, Landscape, Swimming, DG, STP
         // (All other layers use auto area-rule or cantilever-span rule.)
+
+
+        // 1. FloorTypeConfig.cs
+        // ============================================================================
+        // ADD these two properties alongside BeamDepths, SlabThicknesses etc.
+        //
+        //   /// <summary>Column width B in mm (user input from UI)</summary>
+        public int ColumnB { get; set; } = 300;
+        //
+        //   /// <summary>Column depth D in mm (user input from UI)</summary>
+        public int ColumnD { get; set; } = 450;
+        //
+        // ============================================================================
+
         public Dictionary<string, int> SlabThicknesses { get; set; }
             = new Dictionary<string, int>();
 
@@ -127,14 +141,14 @@ namespace ETAB_Automation.Models
                 // ── WHITE layers (area rule thickness) ────────────────────────
                 ["Amenities"] = "AMENITIES",
                 ["Driveway"] = "DRIVEWAY",
-                ["FireWaterTank"] = "FIRE WATER TANK",
+                ["FireWaterTank"] = "WATER TANK",
                 ["GarbageRoom"] = "GARBAGE ROOM",
-                ["GardenDining"] = "GARDEN/DINING AREA",
+                ["GardenDining"] = "GARDEN DINING",
                 ["Gymnasium"] = "GYMNASIUM",
                 ["IndoorSports"] = "INDOOR SPORTS",
-                ["KitchenSink"] = "KITCHEN SUNK",
+                ["KitchenSink"] = "KITCHEN SINK",
                 ["LMR"] = "LMR",
-                ["LMRTop"] = "LMRTOP",
+                ["LMRTop"] = "LMR TOP",
                 ["MeterRoom"] = "METER ROOM",
                 ["MultipurposeHall"] = "MULTIPURPOSE HALL",
                 ["OHTTop"] = "OHT TOP",

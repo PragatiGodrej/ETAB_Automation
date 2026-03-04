@@ -1,5 +1,6 @@
 ﻿
 
+
 //// ============================================================================
 //// END OF FILE
 //// ============================================================================
@@ -115,22 +116,67 @@ namespace ETAB_Automation
                     var floorsPerGrade = importForm.FloorsPerGrade;
                     double foundationHeight = importForm.FoundationHeight;
 
+                    // When basement is present but foundation is unchecked (foundationHeight=0),
+                    // force a minimum of 0.01m so the height shift can be applied.
+                    // This gives Basement1 Plan View Z ≈ 0 instead of 3.5m.
+                    bool hasBasement = floorConfigs.Any(c => c.IsIndividualBasement);
+                    if (hasBasement && foundationHeight <= 0)
+                        foundationHeight = 0.01;
+
                     // ── Build story lists ────────────────────────────────────
                     var storyHeights = new List<double>();
                     var storyNames = new List<string>();
                     int totalStories = 0;
 
+                    // First pass: collect raw user heights and names (bottom → top)
+                    var rawHeights = new List<double>();
                     foreach (var config in floorConfigs)
-                    {
                         for (int i = 0; i < config.Count; i++)
                         {
-                            storyHeights.Add(config.Height);
+                            rawHeights.Add(config.Height);
                             storyNames.Add(GenerateStoryName(config.Name, i, config.Count));
                             totalStories++;
                         }
+
+                    // Second pass: apply height shift when foundation is present.
+                    //
+                    // When foundationHeight > 0, each story's ETABS height =
+                    // the PREVIOUS story's user wall height, seeded with
+                    // foundationHeight for the first story (Basement1).
+                    //
+                    // This ensures Plan View Z = slab level for every story:
+                    //
+                    //   rawHeights:    [3.5,  3.5,  4.5,  4.0,  3.0 ...]
+                    //                   B1    Pod   Gnd   EDk   S01
+                    //   ETABS heights: [1.5,  3.5,  3.5,  4.5,  4.0 ...]
+                    //   Plan View Z:    1.5   5.0   8.5   13.0  17.0  ✓
+                    //
+                    // When foundationHeight = 0: no shift.
+                    if (foundationHeight > 0)
+                    {
+                        // Each story's ETABS height = previous story's raw height,
+                        // seeded with foundationHeight for the first story.
+                        // This ensures Plan View Z = slab level for every story:
+                        //
+                        //   rawHeights:    [3.5,  3.5,  4.0,  3.0]
+                        //                   B1    Pod   Gnd   Terrace
+                        //   ETABS heights: [1.5,  3.5,  3.5,  4.0]
+                        //   Plan View Z:    1.5   5.0   8.5   12.5  ✓
+                        //                   ↑     ↑     ↑      ↑
+                        //                  slab  slab  slab   slab (geomTop matches)
+                        double prev = foundationHeight;
+                        for (int si = 0; si < rawHeights.Count; si++)
+                        {
+                            storyHeights.Add(prev);   // ETABS height = previous story's raw height
+                            prev = rawHeights[si];
+                        }
+                    }
+                    else
+                    {
+                        storyHeights.AddRange(rawHeights);
                     }
 
-                    double totalHeight = storyHeights.Sum();
+                    double totalHeight = rawHeights.Sum();
 
                     // ── Grade schedule validation ────────────────────────────
                     int gradeTotal = floorsPerGrade.Sum();
@@ -189,7 +235,7 @@ namespace ETAB_Automation
 
                     var importer = new CADImporterEnhanced(etabs.SapModel);
                     bool success = importer.ImportMultiFloorTypeCAD(
-                        floorConfigs, storyHeights, storyNames,
+                        floorConfigs, storyHeights, rawHeights, storyNames,
                         seismicZone, wallGrades, floorsPerGrade, foundationHeight);
 
                     if (success)
