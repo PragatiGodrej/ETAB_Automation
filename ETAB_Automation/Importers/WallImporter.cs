@@ -1,7 +1,5 @@
 ﻿
 
-
-
 //// ============================================================================
 //// FILE: Importers/WallImporterEnhanced.cs — VERSION 3.2
 ////
@@ -384,13 +382,12 @@
 //    }
 //}
 // ============================================================================
-// FILE: Importers/WallImporterEnhanced.cs — VERSION 3.2
+// FILE: Importers/WallImporterEnhanced.cs — VERSION 3.3
 //
-// CHANGES from v3.1:
-//   - parapetHeight parameter and effectiveWallHeight field removed.
-//   - All top-corner Z values use (elevation + floorHeight) — original logic.
-//   - Constructor back to 8 arguments (matches all call sites in v4.0).
-//   - No other logic changes.
+// CHANGES from v3.2:
+//   - Added ISCodeVersion parameter to constructor (default = IS2025)
+//   - GetWallSection passes isCode to WallThicknessCalculator
+//   - FindClosestWallSection unchanged
 // ============================================================================
 
 using ETAB_Automation.Core;
@@ -416,6 +413,9 @@ namespace ETABS_CAD_Automation.Importers
         private int ntaWallThicknessMm;
         private readonly Dictionary<string, int> wallThicknessOverrides;
 
+        // ── IS code edition (IS2016 or IS2025) ───────────────────────────
+        private readonly WallThicknessCalculator.ISCodeVersion isCode;
+
         private const double X_TO_M = 0.001;
         private const double Y_TO_M = 0.001;
         private double MX(double x) => x * X_TO_M;
@@ -426,7 +426,7 @@ namespace ETABS_CAD_Automation.Importers
         private Dictionary<string, int> wallTypeCount = new Dictionary<string, int>();
 
         // ====================================================================
-        // CONSTRUCTOR  (8 arguments)
+        // CONSTRUCTOR  (9 arguments — isCode added at end, default IS2025)
         // ====================================================================
         public WallImporterEnhanced(
             cSapModel model,
@@ -436,7 +436,8 @@ namespace ETABS_CAD_Automation.Importers
             string zone,
             GradeScheduleManager gradeManager = null,
             int ntaThicknessMm = 200,
-            Dictionary<string, int> wallOverrides = null)
+            Dictionary<string, int> wallOverrides = null,
+            WallThicknessCalculator.ISCodeVersion isCode = WallThicknessCalculator.ISCodeVersion.IS2025)
         {
             sapModel = model;
             dxfDoc = doc;
@@ -446,6 +447,7 @@ namespace ETABS_CAD_Automation.Importers
             gradeSchedule = gradeManager;
             ntaWallThicknessMm = ntaThicknessMm;
             wallThicknessOverrides = wallOverrides ?? new Dictionary<string, int>();
+            this.isCode = isCode;
 
             DiagnoseCoordinateSystem();
             WallThicknessCalculator.LoadAvailableWallSections(sapModel);
@@ -472,7 +474,7 @@ namespace ETABS_CAD_Automation.Importers
         }
 
         // ====================================================================
-        // WALL SECTION RESOLUTION
+        // WALL SECTION RESOLUTION  — now passes isCode
         // ====================================================================
         private string GetWallSection(WallCategory cat, double wallLengthM, string preferredGrade)
         {
@@ -506,7 +508,8 @@ namespace ETABS_CAD_Automation.Importers
                 totalTypicalFloors, wtType, seismicZone,
                 wallLengthM, false,
                 WallThicknessCalculator.ConstructionType.TypeII,
-                preferredGrade);
+                preferredGrade,
+                isCode);   // ← pass through IS code edition
         }
 
         private string FindClosestWallSection(int targetMm, string preferredGrade)
@@ -548,12 +551,12 @@ namespace ETABS_CAD_Automation.Importers
                     }
                 }
 
-                return best ?? $"W{targetMm}M30";
+                return best ?? $"W{targetMm / 10}M30";
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"⚠ FindClosestWallSection: {ex.Message}");
-                return $"W{targetMm}M30";
+                return $"W{targetMm / 10}M30";
             }
         }
 
@@ -575,9 +578,11 @@ namespace ETABS_CAD_Automation.Importers
             if (wallLayers.Count == 0) return;
 
             string wallGrade = gradeSchedule?.GetWallGradeForStory(story);
+            string codeLabel = isCode == WallThicknessCalculator.ISCodeVersion.IS2016
+                ? "IS2016" : "IS2025";
 
             System.Diagnostics.Debug.WriteLine(
-                $"\n========== IMPORTING WALLS - Story {story} ==========");
+                $"\n========== IMPORTING WALLS - Story {story} [{codeLabel}] ==========");
             System.Diagnostics.Debug.WriteLine(
                 $"Base: {elevation:F3}m | Top: {elevation + floorHeight:F3}m | " +
                 $"Grade: {wallGrade ?? "default"} | NTA: {ntaWallThicknessMm}mm");
@@ -724,11 +729,6 @@ namespace ETABS_CAD_Automation.Importers
             return Math.Sqrt(dx * dx + dy * dy);
         }
 
-        /// <summary>
-        /// ETABS GetNameList returns stories top-down (index 0 = highest story).
-        /// Our story index is bottom-up (0 = lowest floor).
-        /// Flip: names[n - 1 - story] maps correctly bottom→top.
-        /// </summary>
         private string GetStoryName(int story)
         {
             try
@@ -745,7 +745,7 @@ namespace ETABS_CAD_Automation.Importers
         private void DiagnoseCoordinateSystem()
         {
             System.Diagnostics.Debug.WriteLine(
-                "WallImporter v3.2: X/Y→m via ×0.001, Z already in m");
+                $"WallImporter v3.3: X/Y→m via ×0.001, Z already in m | ISCode={isCode}");
         }
 
         public void DefineSections() { }

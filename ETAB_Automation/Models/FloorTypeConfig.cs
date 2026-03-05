@@ -1,12 +1,232 @@
 ﻿
-// ============================================================================
-// FILE: Models/FloorTypeConfig.cs
+//// ============================================================================
+//// FILE: Models/FloorTypeConfig.cs
+//// VERSION: 2.1 — Added ISCodeVersion property
+//// ============================================================================
+
+//using System.Collections.Generic;
+//using ETAB_Automation.Core;
+
+//namespace ETAB_Automation.Models
+//{
+//    public class FloorTypeConfig
+//    {
+//        // ── Basic ─────────────────────────────────────────────────────────
+//        public string Name { get; set; }
+//        public int Count { get; set; }
+//        public double Height { get; set; }
+//        public string CADFilePath { get; set; }
+
+//        // ── Basement ──────────────────────────────────────────────────────
+//        public bool IsIndividualBasement { get; set; } = false;
+//        public int BasementNumber { get; set; } = 0;
+
+//        // ── Podium ────────────────────────────────────────────────────────
+//        public bool IsIndividualPodium { get; set; } = false;
+//        public int PodiumNumber { get; set; } = 0;
+
+//        // ── IS Code Edition ───────────────────────────────────────────────
+//        /// <summary>
+//        /// IS 1893 edition used for wall thickness table lookups.
+//        /// IS2016 = IS 1893:2016 (TDD/PKO)
+//        /// IS2025 = IS 1893:2025 (TDD/MSO)  ← default
+//        /// Set once globally from the UI and propagated to every FloorTypeConfig.
+//        /// </summary>
+//        public WallThicknessCalculator.ISCodeVersion ISCodeVersion { get; set; }
+//            = WallThicknessCalculator.ISCodeVersion.IS2025;
+
+//        // ── Layer mapping: layer name → "Beam" / "Wall" / "Slab" / "Column"
+//        public Dictionary<string, string> LayerMapping { get; set; }
+//            = new Dictionary<string, string>();
+
+//        // ── Beam depths (mm) ──────────────────────────────────────────────
+//        public Dictionary<string, int> BeamDepths { get; set; }
+//            = new Dictionary<string, int>();
+
+//        // ── Beam width overrides (mm, 0 = auto) ───────────────────────────
+//        public Dictionary<string, int> BeamWidthOverrides { get; set; }
+//            = new Dictionary<string, int>();
+
+//        // ── Beam wall load sets ────────────────────────────────────────────
+//        public Dictionary<string, string> BeamWallLoadSets { get; set; }
+//            = new Dictionary<string, string>();
+
+//        // ── Column dimensions ─────────────────────────────────────────────
+//        public int ColumnB { get; set; } = 300;
+//        public int ColumnD { get; set; } = 450;
+
+//        // ── Slab thicknesses (mm, YELLOW layers) ──────────────────────────
+//        public Dictionary<string, int> SlabThicknesses { get; set; }
+//            = new Dictionary<string, int>();
+
+//        // ── Slab load sets ────────────────────────────────────────────────
+//        public Dictionary<string, string> SlabLoadSets { get; set; }
+//            = new Dictionary<string, string>();
+
+//        // ── Wall thickness overrides (mm, 0 = use IS table) ───────────────
+//        public Dictionary<string, int> WallThicknessOverrides { get; set; }
+//            = new Dictionary<string, int>();
+
+//        // ── W-NTA: non-structural wall (always user-defined) ──────────────
+//        public int NtaWallThickness { get; set; } = 200;
+
+//        // ====================================================================
+//        // STATIC DEFAULT LOAD SET TABLES
+//        // ====================================================================
+
+//        public static readonly Dictionary<string, string> DefaultSlabLoadSets
+//            = new Dictionary<string, string>
+//            {
+//                // ── WHITE layers (area rule) ──────────────────────────────
+//                ["Amenities"] = "AMENITIES",
+//                ["Driveway"] = "DRIVEWAY",
+//                ["FireWaterTank"] = "WATER TANK",
+//                ["GarbageRoom"] = "GARBAGE ROOM",
+//                ["GardenDining"] = "GARDEN DINING",
+//                ["Gymnasium"] = "GYMNASIUM",
+//                ["IndoorSports"] = "INDOOR SPORTS",
+//                ["KitchenSink"] = "KITCHEN SINK",
+//                ["LMR"] = "LMR",
+//                ["LMRTop"] = "LMR TOP",
+//                ["MeterRoom"] = "METER ROOM",
+//                ["MultipurposeHall"] = "MULTIPURPOSE HALL",
+//                ["OHTTop"] = "OHT TOP",
+//                ["Parking"] = "PARKING",
+//                ["ParkingToilet"] = "PARKING TOILET",
+//                ["PumpRoom"] = "PUMP ROOM",
+//                ["Refuge"] = "REFUGE",
+//                ["Residential"] = "RESIDENTIAL",
+//                ["Retail"] = "RETAIL",
+//                ["RetailMazzanine"] = "RETAIL MAZZANINE",
+//                ["RetailToilet"] = "RETAIL TOILET",
+//                ["ServiceSlab"] = "SERVICE SLAB",
+//                ["SocietyRoom"] = "SOCIETY ROOM",
+//                ["StackParking"] = "STACK PARKING",
+//                ["Terrace"] = "TERRACE",
+//                ["TerracePumpRoom"] = "TERRACE PUMP ROOM",
+//                ["Toilet"] = "TOILET",
+//                ["Utility"] = "UTILITY",
+//                // ── CYAN layers (cantilever span rule) ────────────────────
+//                ["Balcony"] = "BALCONY",
+//                ["Chajja"] = "CHAJJA",
+//                ["ChajjaODU"] = "CHAJJA+ODU",
+//                // ── YELLOW layers (user fixed thickness) ──────────────────
+//                ["FireTender"] = "FIRE TENDER",
+//                ["Lobby"] = "LOBBY",
+//                ["OHT"] = "OHT",
+//                ["Staircase"] = "STAIRCASE",
+//                ["TerraceFire"] = "TERRACE FIRE TANK",
+//                ["UGT"] = "UGT",
+//                ["Landscape"] = "LANDSCAPE",
+//                ["Swimming"] = "SWIMMING",
+//                ["DG"] = "DG",
+//                ["STP"] = "STP",
+//            };
+
+//        public static readonly Dictionary<string, string> DefaultBeamWallLoadSets
+//            = new Dictionary<string, string>
+//            {
+//                ["InternalGravity"] = "WALL LOAD",
+//                ["CantileverGravity"] = "WALL LOAD",
+//                ["NoLoadGravity"] = "",
+//                ["EdeckGravity"] = "WALL LOAD",
+//                ["PodiumGravity"] = "WALL LOAD",
+//                ["GroundGravity"] = "WALL LOAD",
+//                ["BasementGravity"] = "WALL LOAD",
+//                ["CoreMain"] = "WALL LOAD",
+//                ["PeripheralDeadMain"] = "WALL LOAD",
+//                ["PeripheralPortalMain"] = "WALL LOAD",
+//                ["InternalMain"] = "WALL LOAD",
+//            };
+
+//        // ====================================================================
+//        // HELPERS
+//        // ====================================================================
+
+//        public int GetBeamDepth(string key, int fallback = 450)
+//            => BeamDepths.TryGetValue(key, out int v) ? v : fallback;
+
+//        public int GetBeamWidthOverride(string key)
+//        {
+//            if (BeamWidthOverrides.TryGetValue(key, out int v)) return v;
+//            if (key.EndsWith("GravityWidth") &&
+//                BeamWidthOverrides.TryGetValue("GravityWidth", out int legacy))
+//                return legacy;
+//            return 0;
+//        }
+
+//        public string GetBeamWallLoadSet(string key)
+//        {
+//            if (BeamWallLoadSets.TryGetValue(key, out string v)) return v;
+//            if (DefaultBeamWallLoadSets.TryGetValue(key, out string def)) return def;
+//            return "WALL LOAD";
+//        }
+
+//        public int GetSlabThickness(string key, int fallback = 150)
+//            => SlabThicknesses.TryGetValue(key, out int v) ? v : fallback;
+
+//        public string GetSlabLoadSet(string key)
+//        {
+//            if (SlabLoadSets.TryGetValue(key, out string v)) return v;
+//            if (DefaultSlabLoadSets.TryGetValue(key, out string def)) return def;
+//            return key.ToUpperInvariant();
+//        }
+
+//        public int GetWallThicknessOverride(string key)
+//            => WallThicknessOverrides.TryGetValue(key, out int v) ? v : 0;
+
+//        // ── Convenience type flags ────────────────────────────────────────
+//        public bool IsBasementType => IsIndividualBasement;
+//        public bool IsPodiumType => IsIndividualPodium;
+//        public bool IsTypicalType => Name == "Typical";
+//        public bool IsTerraceType => Name == "Terrace";
+//        public bool IsGroundType => Name == "Ground";
+//        public bool IsEDeckType => Name == "EDeck";
+//    }
+//}
 
 // ============================================================================
+// FILE: Models/FloorTypeConfig.cs
+// VERSION: 3.0 — Individual load pattern values per slab layer (no Load Sets)
+// ============================================================================
+
 using System.Collections.Generic;
+using ETAB_Automation.Core;
 
 namespace ETAB_Automation.Models
 {
+    /// <summary>
+    /// Holds individual load-pattern magnitudes (kN/m²) for one slab layer.
+    /// Each field maps to a specific ETABS load pattern.
+    /// Zero means the load is not applicable → that pattern is skipped.
+    /// </summary>
+    public class SlabLoads
+    {
+        public double FF { get; set; }   // → ETABS pattern "FLOOR FINISH" (SDL)
+        public double Filling { get; set; }   // → ETABS pattern "FILLING"      (SDL)
+        public double ASDL { get; set; }   // → ETABS pattern "ASDL"         (SDL)
+        public double LL { get; set; }   // → ETABS pattern "LL"
+        public double LL3 { get; set; }   // → ETABS pattern "LL>3"
+        public double FireTender { get; set; }   // → ETABS pattern "FIRE TENDER"
+        public double TreeLoad { get; set; }   // → ETABS pattern "TREE LOAD"
+        public double MachineRoom { get; set; }   // → ETABS pattern "MACHINE ROOM"
+        public double WaterTank { get; set; }   // → ETABS pattern "WATER TANK"
+
+        /// <summary>Quick constructor for the most common fields.</summary>
+        public SlabLoads() { }
+        public SlabLoads(double ff, double fill, double asdl, double ll,
+            double ll3 = 0, double ft = 0, double tree = 0,
+            double mach = 0, double wt = 0)
+        {
+            FF = ff; Filling = fill; ASDL = asdl; LL = ll;
+            LL3 = ll3; FireTender = ft; TreeLoad = tree;
+            MachineRoom = mach; WaterTank = wt;
+        }
+
+        public SlabLoads Clone() => new SlabLoads(FF, Filling, ASDL, LL,
+            LL3, FireTender, TreeLoad, MachineRoom, WaterTank);
+    }
+
     public class FloorTypeConfig
     {
         // ── Basic ─────────────────────────────────────────────────────────
@@ -19,194 +239,126 @@ namespace ETAB_Automation.Models
         public bool IsIndividualBasement { get; set; } = false;
         public int BasementNumber { get; set; } = 0;
 
-        // ── Podium (individual tabs, parallel to Basement) ────────────────
+        // ── Podium ────────────────────────────────────────────────────────
         public bool IsIndividualPodium { get; set; } = false;
         public int PodiumNumber { get; set; } = 0;
 
+        // ── IS Code Edition ───────────────────────────────────────────────
+        /// <summary>
+        /// IS 1893 edition used for wall thickness table lookups.
+        /// IS2016 = IS 1893:2016 (TDD/PKO)
+        /// IS2025 = IS 1893:2025 (TDD/MSO)  ← default
+        /// Set once globally from the UI and propagated to every FloorTypeConfig.
+        /// </summary>
+        public WallThicknessCalculator.ISCodeVersion ISCodeVersion { get; set; }
+            = WallThicknessCalculator.ISCodeVersion.IS2025;
 
         // ── Layer mapping: layer name → "Beam" / "Wall" / "Slab" / "Column"
         public Dictionary<string, string> LayerMapping { get; set; }
             = new Dictionary<string, string>();
 
-        // ====================================================================
-        // BEAM DEPTHS (mm) — all user-defined
-        // ====================================================================
-        // Gravity keys : InternalGravity, CantileverGravity, NoLoadGravity,
-        //                EdeckGravity, PodiumGravity, GroundGravity, BasementGravity
-        // Main keys    : CoreMain, PeripheralDeadMain,
-        //                PeripheralPortalMain, InternalMain
+        // ── Beam depths (mm) ──────────────────────────────────────────────
         public Dictionary<string, int> BeamDepths { get; set; }
             = new Dictionary<string, int>();
 
-        // ====================================================================
-        // BEAM WIDTH OVERRIDES (mm) — 0 = use auto rule
-        // ====================================================================
-        // Per-variant gravity widths (each overridable independently):
-        //   InternalGravityWidth, CantileverGravityWidth, NoLoadGravityWidth,
-        //   EdeckGravityWidth, PodiumGravityWidth, GroundGravityWidth,
-        //   BasementGravityWidth
-        //   Auto rule: 200 mm (Zone II/III) | 240 mm (Zone IV/V)
-        //
-        // Main beam widths (auto = matching wall thickness):
-        //   CoreMainWidth, PeripheralDeadMainWidth,
-        //   PeripheralPortalMainWidth, InternalMainWidth
+        // ── Beam width overrides (mm, 0 = auto) ───────────────────────────
         public Dictionary<string, int> BeamWidthOverrides { get; set; }
             = new Dictionary<string, int>();
 
-        // ====================================================================
-        // BEAM WALL LOAD SETS — "WALL LOAD" case (user-named load patterns)
-        // ====================================================================
-        // One entry per beam layer key.  The value is the ETABS load pattern
-        // name to apply as wall/dead load on that beam type.
-        // B-No Load Gravity beams always get 0 (no wall load) — store empty
-        // string or "0" to indicate this.
-        //
-        // Keys mirror BeamDepths gravity + main keys:
-        //   InternalGravity, CantileverGravity, NoLoadGravity (→ "0"),
-        //   EdeckGravity, PodiumGravity, GroundGravity, BasementGravity,
-        //   CoreMain, PeripheralDeadMain, PeripheralPortalMain, InternalMain
+        // ── Beam wall load sets ────────────────────────────────────────────
         public Dictionary<string, string> BeamWallLoadSets { get; set; }
             = new Dictionary<string, string>();
 
-        // ====================================================================
-        // SLAB THICKNESSES — YELLOW layers (mm, user input)
-        // ====================================================================
-        // Keys: Lobby, Stair, FireTender, OHT, TerraceFire,
-        //       UGT, Landscape, Swimming, DG, STP
-        // (All other layers use auto area-rule or cantilever-span rule.)
-
-
-        // 1. FloorTypeConfig.cs
-        // ============================================================================
-        // ADD these two properties alongside BeamDepths, SlabThicknesses etc.
-        //
-        //   /// <summary>Column width B in mm (user input from UI)</summary>
+        // ── Column dimensions ─────────────────────────────────────────────
         public int ColumnB { get; set; } = 300;
-        //
-        //   /// <summary>Column depth D in mm (user input from UI)</summary>
         public int ColumnD { get; set; } = 450;
-        //
-        // ============================================================================
 
+        // ── Slab thicknesses (mm, YELLOW layers) ──────────────────────────
         public Dictionary<string, int> SlabThicknesses { get; set; }
             = new Dictionary<string, int>();
 
-        // ====================================================================
-        // SLAB LOAD SETS — ETABS load pattern name per slab layer
-        // ====================================================================
-        // Every slab layer (WHITE, CYAN, and YELLOW) has an assigned load set.
-        // The value is the ETABS load pattern name (e.g. "AMENITIES",
-        // "BALCONY", "FIRE TENDER", "LOBBY", "OHT", "UGT", "SWIMMING", …).
-        // Matches the "Slab load set assigned" column in the reference table.
-        //
-        // Full key list (use exact CAD layer name as key, minus the "S-" prefix
-        // for brevity, or use the full layer name — be consistent):
-        //   Amenities, Balcony, Chajja, ChajjaODU, Driveway, FireTender,
-        //   FireWaterTank, GarbageRoom, GardenDining, Gymnasium, IndoorSports,
-        //   KitchenSink, LMR, LMRTop, Lobby, MeterRoom, MultipurposeHall,
-        //   OHT, OHTTop, Parking, ParkingToilet, PumpRoom, Refuge,
-        //   Residential, Retail, RetailMazzanine, RetailToilet, ServiceSlab,
-        //   SocietyRoom, StackParking, Staircase, Terrace, TerracePumpRoom,
-        //   Toilet, UGT, Landscape, Swimming, DG, STP, Utility
-        public Dictionary<string, string> SlabLoadSets { get; set; }
-            = new Dictionary<string, string>();
+        // ── Slab individual loads (kN/m² per load pattern per layer) ────────
+        public Dictionary<string, SlabLoads> SlabIndividualLoads { get; set; }
+            = new Dictionary<string, SlabLoads>();
 
-        // ====================================================================
-        // WALL THICKNESS OVERRIDES (mm) — 0 = use GPL IS 1893-2025 table
-        // ====================================================================
-        // Keys: CoreWall, PeriphDeadWall, PeriphPortalWall, InternalWall
+        // ── Wall thickness overrides (mm, 0 = use IS table) ───────────────
         public Dictionary<string, int> WallThicknessOverrides { get; set; }
             = new Dictionary<string, int>();
 
-        // ── W-NTA: always user-defined, never from GPL table ──────────────
+        // ── W-NTA: non-structural wall (always user-defined) ──────────────
         public int NtaWallThickness { get; set; } = 200;
 
         // ====================================================================
-        // STATIC DEFAULT LOAD SET TABLES
+        // STATIC DEFAULT INDIVIDUAL LOAD TABLES (kN/m²)
+        // constructor args: ff, fill, asdl, ll, ll3, fireTender, treeLoad, machineRoom, waterTank
+        // Zero = not applicable (that ETABS pattern is skipped).
         // ====================================================================
-        // These provide the baseline load set names shown in the reference
-        // table (Image 1 / Image 2).  The UI pre-fills from these; users can
-        // override per floor type.
 
-        /// <summary>
-        /// Default slab load set names, keyed by the short slab layer name
-        /// (i.e. the part after "S-" in the CAD layer, normalised to PascalCase).
-        /// Source: "Slab load set assigned" column in the reference table.
-        /// CYAN layers (cantilever) are marked with prefix "CYAN:" so the
-        /// importer knows to apply a span-based thickness instead of a fixed one.
-        /// </summary>
-        public static readonly Dictionary<string, string> DefaultSlabLoadSets
-            = new Dictionary<string, string>
+        public static readonly Dictionary<string, SlabLoads> DefaultSlabIndividualLoads
+            = new Dictionary<string, SlabLoads>
             {
-                // ── WHITE layers (area rule thickness) ────────────────────────
-                ["Amenities"] = "AMENITIES",
-                ["Driveway"] = "DRIVEWAY",
-                ["FireWaterTank"] = "WATER TANK",
-                ["GarbageRoom"] = "GARBAGE ROOM",
-                ["GardenDining"] = "GARDEN DINING",
-                ["Gymnasium"] = "GYMNASIUM",
-                ["IndoorSports"] = "INDOOR SPORTS",
-                ["KitchenSink"] = "KITCHEN SINK",
-                ["LMR"] = "LMR",
-                ["LMRTop"] = "LMR TOP",
-                ["MeterRoom"] = "METER ROOM",
-                ["MultipurposeHall"] = "MULTIPURPOSE HALL",
-                ["OHTTop"] = "OHT TOP",
-                ["Parking"] = "PARKING",
-                ["ParkingToilet"] = "PARKING TOILET",
-                ["PumpRoom"] = "PUMP ROOM",
-                ["Refuge"] = "REFUGE",
-                ["Residential"] = "RESIDENTIAL",
-                ["Retail"] = "RETAIL",
-                ["RetailMazzanine"] = "RETAIL MAZZANINE",
-                ["RetailToilet"] = "RETAIL TOILET",
-                ["ServiceSlab"] = "SERVICE SLAB",
-                ["SocietyRoom"] = "SOCIETY ROOM",
-                ["StackParking"] = "STACK PARKING",
-                ["Terrace"] = "TERRACE",
-                ["TerracePumpRoom"] = "TERRACE PUMP ROOM",
-                ["Toilet"] = "TOILET",
-                ["Utility"] = "UTILITY",
-
-                // ── CYAN layers (cantilever span rule) ────────────────────────
-                ["Balcony"] = "BALCONY",
-                ["Chajja"] = "CHAJJA",
-                ["ChajjaODU"] = "CHAJJA+ODU",
-
-                // ── YELLOW layers (user-input fixed thickness) ─────────────────
-                ["FireTender"] = "FIRE TENDER",
-                ["Lobby"] = "LOBBY",
-                ["OHT"] = "OHT",
-                ["Staircase"] = "STAIRCASE",
-                ["TerraceFire"] = "TERRACE FIRE TANK",
-                ["UGT"] = "UGT",
-                ["Landscape"] = "LANDSCAPE",
-                ["Swimming"] = "SWIMMING",
-                ["DG"] = "DG",
-                ["STP"] = "STP",
+                //                              ff     fill  asdl  ll    ll3   ft    tree mach  wt
+                ["Amenities"] = new SlabLoads(1.55, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["Balcony"] = new SlabLoads(1.55, 1, 1, 3, 0, 0, 0, 0, 0),
+                ["Chajja"] = new SlabLoads(1.2, 0, 1, 0.75, 0, 0, 0, 0, 0),
+                ["ChajjaODU"] = new SlabLoads(1.2, 0, 1, 1, 0, 0, 0, 0, 0),
+                ["Driveway"] = new SlabLoads(2.5, 0, 1, 2.5, 0, 0, 0, 0, 0),
+                ["FireTender"] = new SlabLoads(6, 0, 1, 0, 4, 15, 0, 0, 0),
+                ["FireWaterTank"] = new SlabLoads(0, 0, 1, 0, 0, 0, 0, 0, 30),
+                ["GarbageRoom"] = new SlabLoads(2, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["GardenDining"] = new SlabLoads(3.6, 20, 1, 0, 5, 0, 2.5, 0, 0),
+                ["Gymnasium"] = new SlabLoads(1.55, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["IndoorSports"] = new SlabLoads(1.55, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["Kitchen"] = new SlabLoads(1.55, 0, 1, 2, 0, 0, 0, 0, 0),
+                ["KitchenSink"] = new SlabLoads(1.55, 1.5, 1, 2, 0, 0, 0, 0, 0),
+                ["LMR"] = new SlabLoads(1.55, 0, 1, 0, 0, 0, 0, 10, 0),
+                ["LMRTop"] = new SlabLoads(6, 0, 1, 2, 0, 0, 0, 0, 0),
+                ["Lobby"] = new SlabLoads(1.55, 0, 1, 3, 0, 0, 0, 0, 0),
+                ["MeterRoom"] = new SlabLoads(2, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["MultipurposeHall"] = new SlabLoads(1.55, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["OHT"] = new SlabLoads(0, 0, 1, 0, 0, 0, 0, 0, 30),
+                ["OHTTop"] = new SlabLoads(6, 0, 1, 2, 0, 0, 0, 0, 0),
+                ["Parking"] = new SlabLoads(2.5, 0, 1, 2.5, 0, 0, 0, 0, 0),
+                ["ParkingToilet"] = new SlabLoads(1.55, 3, 1, 2, 0, 0, 0, 0, 0),
+                ["PumpRoom"] = new SlabLoads(1.55, 0, 1, 0, 15, 0, 0, 0, 0),
+                ["Refuge"] = new SlabLoads(3.6, 0, 1, 3, 0, 0, 0, 0, 0),
+                ["Residential"] = new SlabLoads(1.55, 0, 1, 2, 0, 0, 0, 0, 0),
+                ["Retail"] = new SlabLoads(5, 0, 1, 0, 4, 0, 0, 0, 0),
+                ["RetailMazzanine"] = new SlabLoads(5, 0, 1, 0, 7.5, 0, 0, 0, 0),
+                ["RetailToilet"] = new SlabLoads(1.55, 4.8, 1, 2, 0, 0, 0, 0, 0),
+                ["ServiceSlab"] = new SlabLoads(1.25, 0, 1, 1, 0, 0, 0, 0, 0),
+                ["SocietyRoom"] = new SlabLoads(1.55, 0, 1, 3, 0, 0, 0, 0, 0),
+                ["StackParking"] = new SlabLoads(2.5, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["Staircase"] = new SlabLoads(4.7, 0, 1, 3, 0, 0, 0, 0, 0),
+                ["Terrace"] = new SlabLoads(6.55, 0, 1, 3, 0, 0, 0, 0, 0),
+                ["TerraceFire"] = new SlabLoads(0, 0, 1, 0, 0, 0, 0, 0, 30),
+                ["TerracePumpRoom"] = new SlabLoads(6, 0, 1, 0, 5, 0, 0, 0, 0),
+                ["Toilet"] = new SlabLoads(1.55, 1.8, 1, 2, 0, 0, 0, 0, 0),
+                ["UGT"] = new SlabLoads(0, 0, 1, 0, 0, 0, 0, 0, 50),
+                ["Landscape"] = new SlabLoads(0, 24, 1, 0, 4, 0, 0, 0, 0),
+                ["Swimming"] = new SlabLoads(6, 17, 1, 0, 5, 0, 0, 0, 0),
+                ["DG"] = new SlabLoads(1.55, 0, 1, 0, 20, 0, 0, 0, 0),
+                ["STP"] = new SlabLoads(0, 0, 1, 0, 0, 0, 0, 0, 60),
+                ["Utility"] = new SlabLoads(1.55, 0, 1, 2, 0, 0, 0, 0, 0),
             };
 
-        /// <summary>
-        /// Default beam wall load set names per beam-type key.
-        /// Source: "Beam Wall load set assigned" column in Image 2.
-        /// Empty string = no wall load (B-No Load Gravity Beams).
-        /// The actual ETABS load pattern name is user-defined; these are
-        /// sensible starting defaults shown in the UI.
-        /// </summary>
+        // Alias used by SlabImporter
+        public static Dictionary<string, SlabLoads> DefaultSlabLoads => DefaultSlabIndividualLoads;
+
         public static readonly Dictionary<string, string> DefaultBeamWallLoadSets
             = new Dictionary<string, string>
             {
-                ["InternalGravity"] = "WALL LOAD",   // user input — typical UDL
-                ["CantileverGravity"] = "WALL LOAD",   // user input
-                ["NoLoadGravity"] = "",             // 0 — no wall load
-                ["EdeckGravity"] = "WALL LOAD",   // user input
-                ["PodiumGravity"] = "WALL LOAD",   // user input
-                ["GroundGravity"] = "WALL LOAD",   // user input
-                ["BasementGravity"] = "WALL LOAD",   // user input
-                ["CoreMain"] = "WALL LOAD",   // user input
-                ["PeripheralDeadMain"] = "WALL LOAD",   // user input
-                ["PeripheralPortalMain"] = "WALL LOAD",   // user input
-                ["InternalMain"] = "WALL LOAD",   // user input
+                ["InternalGravity"] = "WALL LOAD",
+                ["CantileverGravity"] = "WALL LOAD",
+                ["NoLoadGravity"] = "",
+                ["EdeckGravity"] = "WALL LOAD",
+                ["PodiumGravity"] = "WALL LOAD",
+                ["GroundGravity"] = "WALL LOAD",
+                ["BasementGravity"] = "WALL LOAD",
+                ["CoreMain"] = "WALL LOAD",
+                ["PeripheralDeadMain"] = "WALL LOAD",
+                ["PeripheralPortalMain"] = "WALL LOAD",
+                ["InternalMain"] = "WALL LOAD",
             };
 
         // ====================================================================
@@ -216,26 +368,15 @@ namespace ETAB_Automation.Models
         public int GetBeamDepth(string key, int fallback = 450)
             => BeamDepths.TryGetValue(key, out int v) ? v : fallback;
 
-        /// <summary>
-        /// Returns the width override for a beam variant.
-        /// Falls back to the legacy shared "GravityWidth" key so configs
-        /// saved before v2.4 (single shared gravity width) still load correctly.
-        /// </summary>
         public int GetBeamWidthOverride(string key)
         {
             if (BeamWidthOverrides.TryGetValue(key, out int v)) return v;
-            // Legacy fallback for any gravity variant
             if (key.EndsWith("GravityWidth") &&
                 BeamWidthOverrides.TryGetValue("GravityWidth", out int legacy))
                 return legacy;
-            return 0;   // 0 = auto
+            return 0;
         }
 
-        /// <summary>
-        /// Returns the wall load set name for a beam type.
-        /// Falls back to the static default table if not explicitly overridden.
-        /// Returns empty string for B-No Load beams (no wall load).
-        /// </summary>
         public string GetBeamWallLoadSet(string key)
         {
             if (BeamWallLoadSets.TryGetValue(key, out string v)) return v;
@@ -246,15 +387,11 @@ namespace ETAB_Automation.Models
         public int GetSlabThickness(string key, int fallback = 150)
             => SlabThicknesses.TryGetValue(key, out int v) ? v : fallback;
 
-        /// <summary>
-        /// Returns the ETABS load pattern name for a slab layer.
-        /// Falls back to the static default table if not explicitly overridden.
-        /// </summary>
-        public string GetSlabLoadSet(string key)
+        public SlabLoads GetSlabIndividualLoads(string key)
         {
-            if (SlabLoadSets.TryGetValue(key, out string v)) return v;
-            if (DefaultSlabLoadSets.TryGetValue(key, out string def)) return def;
-            return key.ToUpperInvariant();  // last-resort: use layer name itself
+            if (SlabIndividualLoads.TryGetValue(key, out SlabLoads v)) return v;
+            if (DefaultSlabIndividualLoads.TryGetValue(key, out SlabLoads def)) return def;
+            return new SlabLoads(0, 0, 1, 2); // safe fallback: ASDL=1, LL=2
         }
 
         public int GetWallThicknessOverride(string key)
@@ -269,6 +406,3 @@ namespace ETAB_Automation.Models
         public bool IsEDeckType => Name == "EDeck";
     }
 }
-// ============================================================================
-// END OF FILE
-// ============================================================================

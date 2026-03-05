@@ -1,12 +1,11 @@
-﻿
-//// ============================================================================
-//// ============================================================================
+﻿//// ============================================================================
 //// FILE: UI/ImportConfigForm.cs (PART 1 - Main Form)
 //// ============================================================================
 //// PURPOSE: Main configuration form class with core logic
-//// VERSION: 2.6 — Per-variant gravity width overrides + Slab/Beam load sets UI
+//// VERSION: 2.7 — IS 1893 Code Edition selector (2016 / 2025)
 //// ============================================================================
 
+//using ETAB_Automation.Core;
 //using ETAB_Automation.Importers;
 //using ETAB_Automation.Models;
 //using System;
@@ -24,6 +23,10 @@
 
 //        public List<FloorTypeConfig> FloorConfigs { get; private set; }
 //        public string SeismicZone { get; private set; }
+
+//        // ── 1a. New public property for selected IS Code ──────────────────
+//        public WallThicknessCalculator.ISCodeVersion SelectedISCode { get; private set; }
+
 //        public List<string> WallGrades { get; private set; }
 //        public List<int> FloorsPerGrade { get; private set; }
 //        public double FoundationHeight { get; private set; }
@@ -57,6 +60,9 @@
 //        internal NumericUpDown numTerraceheight;
 //        internal NumericUpDown numFoundationHeight;
 //        internal ComboBox cmbSeismicZone;
+
+//        // ── 1b. New ComboBox for IS Code edition ─────────────────────────
+//        internal ComboBox cmbISCode;
 
 //        // Grade schedule
 //        internal DataGridView dgvGradeSchedule;
@@ -101,19 +107,17 @@
 //        internal Dictionary<string, NumericUpDown> numPeripheralPortalMainWidthOverridePerFloor;
 //        internal Dictionary<string, NumericUpDown> numInternalMainWidthOverridePerFloor;
 
-//        // ── Per-floor BEAM WALL LOAD SETS ────────────────────────────────
-//        // One TextBox per beam layer; user types the ETABS load pattern name
-//        internal Dictionary<string, TextBox> txtInternalGravityLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtCantileverGravityLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtNoLoadGravityLoadSetPerFloor;   // always "0" / disabled
-//        internal Dictionary<string, TextBox> txtEDeckGravityLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtPodiumGravityLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtGroundGravityLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtBasementGravityLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtCoreMainLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtPeripheralDeadMainLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtPeripheralPortalMainLoadSetPerFloor;
-//        internal Dictionary<string, TextBox> txtInternalMainLoadSetPerFloor;
+//        // ── SHARED BEAM WALL LOAD SETS (one for all floor plans) ─────────
+//        internal TextBox txtSharedInternalGravityLoadSet;
+//        internal TextBox txtSharedCantileverGravityLoadSet;
+//        internal TextBox txtSharedEDeckGravityLoadSet;
+//        internal TextBox txtSharedPodiumGravityLoadSet;
+//        internal TextBox txtSharedGroundGravityLoadSet;
+//        internal TextBox txtSharedBasementGravityLoadSet;
+//        internal TextBox txtSharedCoreMainLoadSet;
+//        internal TextBox txtSharedPeripheralDeadMainLoadSet;
+//        internal TextBox txtSharedPeripheralPortalMainLoadSet;
+//        internal TextBox txtSharedInternalMainLoadSet;
 
 //        // ── Per-floor slab thicknesses — YELLOW layers ───────────────────
 //        internal Dictionary<string, NumericUpDown> numLobbySlabThicknessPerFloor;
@@ -127,10 +131,9 @@
 //        internal Dictionary<string, NumericUpDown> numDGSlabPerFloor;
 //        internal Dictionary<string, NumericUpDown> numSTPSlabPerFloor;
 
-//        // ── Per-floor SLAB LOAD SETS — all layers (YELLOW + WHITE + CYAN) ─
+//        // ── SHARED SLAB LOAD SETS (one for all floor plans) ──────────────
 //        // Key = short slab key (e.g. "Lobby", "Residential", "Balcony")
-//        // Value TextBox = ETABS load pattern name, pre-filled from DefaultSlabLoadSets
-//        internal Dictionary<string, Dictionary<string, TextBox>> slabLoadSetTextBoxesPerFloor;
+//        internal Dictionary<string, TextBox> sharedSlabLoadSetTextBoxes;
 
 //        // ── Per-floor wall thickness overrides ──────────────────────────
 //        internal Dictionary<string, NumericUpDown> numCoreWallOverridePerFloor;
@@ -139,14 +142,9 @@
 //        internal Dictionary<string, NumericUpDown> numInternalWallOverridePerFloor;
 //        internal Dictionary<string, NumericUpDown> numNtaWallThicknessPerFloor;
 
-
-
-//        // ── A) ADD two dict declarations alongside the other per-floor dicts ─────────
-//        // (place after numNtaWallThicknessPerFloor declaration, ~line 934)
-
-//        //   // ── Per-floor COLUMN dimensions (B × D) ─────────────────────────────
-//           internal Dictionary<string, NumericUpDown> numColumnBPerFloor;
-//           internal Dictionary<string, NumericUpDown> numColumnDPerFloor;
+//        // ── Per-floor COLUMN dimensions (B × D) ─────────────────────────────
+//        internal Dictionary<string, NumericUpDown> numColumnBPerFloor;
+//        internal Dictionary<string, NumericUpDown> numColumnDPerFloor;
 
 //        // ====================================================================
 //        // CONSTRUCTOR
@@ -154,6 +152,10 @@
 
 //        public ImportConfigForm()
 //        {
+//            // numTerraceheight has no UI control — must initialize BEFORE InitializeComponent
+//            // because ChkTerrace_CheckedChanged fires during init and references this field
+//            numTerraceheight = new NumericUpDown { Value = 3.0M };
+
 //            InitializeComponent();
 
 //            FloorConfigs = new List<FloorTypeConfig>();
@@ -197,17 +199,8 @@
 //            numInternalMainWidthOverridePerFloor = new Dictionary<string, NumericUpDown>();
 
 //            // Beam wall load set dicts
-//            txtInternalGravityLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtCantileverGravityLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtNoLoadGravityLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtEDeckGravityLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtPodiumGravityLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtGroundGravityLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtBasementGravityLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtCoreMainLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtPeripheralDeadMainLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtPeripheralPortalMainLoadSetPerFloor = new Dictionary<string, TextBox>();
-//            txtInternalMainLoadSetPerFloor = new Dictionary<string, TextBox>();
+//            // Shared load set TextBoxes — created by InitializeLoadSetsTab()
+//            sharedSlabLoadSetTextBoxes = new Dictionary<string, TextBox>();
 
 //            // Slab thickness dicts
 //            numLobbySlabThicknessPerFloor = new Dictionary<string, NumericUpDown>();
@@ -221,8 +214,7 @@
 //            numDGSlabPerFloor = new Dictionary<string, NumericUpDown>();
 //            numSTPSlabPerFloor = new Dictionary<string, NumericUpDown>();
 
-//            // Slab load set dict-of-dicts
-//            slabLoadSetTextBoxesPerFloor = new Dictionary<string, Dictionary<string, TextBox>>();
+//            // sharedSlabLoadSetTextBoxes initialized above
 
 //            // Wall override dicts
 //            numCoreWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
@@ -231,11 +223,9 @@
 //            numInternalWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
 //            numNtaWallThicknessPerFloor = new Dictionary<string, NumericUpDown>();
 
-//            // column data
-
+//            // Column data
 //            numColumnBPerFloor = new Dictionary<string, NumericUpDown>();
 //            numColumnDPerFloor = new Dictionary<string, NumericUpDown>();
-
 
 //            InitializeControlsUI();
 //        }
@@ -479,7 +469,6 @@
 
 //        private void ChkTerrace_CheckedChanged(object sender, EventArgs e)
 //        {
-//            numTerraceheight.Enabled = chkTerrace.Checked;
 //            UpdateTotalFloorsForGradeSchedule();
 //        }
 
@@ -506,6 +495,12 @@
 //                if (!CollectFloorConfigs()) return;
 
 //                SeismicZone = cmbSeismicZone.SelectedItem?.ToString() ?? "Zone IV (Ahmedabad & Kolkata)";
+
+//                // ── 1c. Capture the selected IS code ─────────────────────
+//                SelectedISCode = (cmbISCode.SelectedIndex == 0)
+//                    ? WallThicknessCalculator.ISCodeVersion.IS2016
+//                    : WallThicknessCalculator.ISCodeVersion.IS2025;
+
 //                FoundationHeight = chkFoundation.Checked ? (double)numFoundationHeight.Value : 0;
 
 //                ShowConfirmation();
@@ -571,14 +566,13 @@
 //                for (int i = 1; i <= cnt; i++)
 //                    sequence.Add($"Basement{i}");
 //            }
+//            if (chkGround.Checked) sequence.Add("Ground");
 //            if (chkPodium.Checked)
 //            {
 //                int cnt = (int)numPodiumLevels.Value;
 //                for (int i = 1; i <= cnt; i++)
 //                    sequence.Add($"Podium{i}");
 //            }
-
-//            if (chkGround.Checked) sequence.Add("Ground");
 //            if (chkEDeck.Checked) sequence.Add("EDeck");
 
 //            if (chkTypical.Checked)
@@ -637,7 +631,7 @@
 //            if (ft == "Ground") return (double)numGroundHeight.Value;
 //            if (ft == "EDeck") return (double)numEDeckHeight.Value;
 //            if (ft == "Typical") return (double)numTypicalHeight.Value;
-//            if (ft == "Terrace") return (double)numTerraceheight.Value;
+//            if (ft == "Terrace") return 3.0;   // fixed height — no UI control
 //            return 3.0;
 //        }
 
@@ -665,7 +659,6 @@
 //                BasementNumber = bNum,
 //                IsIndividualPodium = isPodium,
 //                PodiumNumber = pNum,
-//                //IsRefuge = name == "Refuge",
 //                CADFilePath = cadPathTextBoxes[name].Text,
 //                LayerMapping = GetLayerMapping(name),
 //                BeamDepths = GetBeamDepthsForFloor(name),
@@ -688,8 +681,6 @@
 //        private int SafeGetDepth(Dictionary<string, NumericUpDown> dict, string ft, int fallback)
 //            => dict.ContainsKey(ft) ? (int)dict[ft].Value : fallback;
 
-//        private string SafeGetLoadSet(Dictionary<string, TextBox> dict, string ft, string fallback)
-//            => dict.ContainsKey(ft) ? dict[ft].Text.Trim() : fallback;
 
 //        private Dictionary<string, int> GetBeamDepthsForFloor(string ft)
 //        {
@@ -745,19 +736,21 @@
 //        /// </summary>
 //        private Dictionary<string, string> GetBeamWallLoadSetsForFloor(string ft)
 //        {
+//            // Shared across all floors — read from Load Sets tab
+//            string T(TextBox tb) => tb?.Text?.Trim() ?? "WALL LOAD";
 //            return new Dictionary<string, string>
 //            {
-//                ["InternalGravity"] = SafeGetLoadSet(txtInternalGravityLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["CantileverGravity"] = SafeGetLoadSet(txtCantileverGravityLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["NoLoadGravity"] = "",   // always 0 — no wall load
-//                ["EdeckGravity"] = SafeGetLoadSet(txtEDeckGravityLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["PodiumGravity"] = SafeGetLoadSet(txtPodiumGravityLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["GroundGravity"] = SafeGetLoadSet(txtGroundGravityLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["BasementGravity"] = SafeGetLoadSet(txtBasementGravityLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["CoreMain"] = SafeGetLoadSet(txtCoreMainLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["PeripheralDeadMain"] = SafeGetLoadSet(txtPeripheralDeadMainLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["PeripheralPortalMain"] = SafeGetLoadSet(txtPeripheralPortalMainLoadSetPerFloor, ft, "WALL LOAD"),
-//                ["InternalMain"] = SafeGetLoadSet(txtInternalMainLoadSetPerFloor, ft, "WALL LOAD"),
+//                ["InternalGravity"] = T(txtSharedInternalGravityLoadSet),
+//                ["CantileverGravity"] = T(txtSharedCantileverGravityLoadSet),
+//                ["NoLoadGravity"] = "",
+//                ["EdeckGravity"] = T(txtSharedEDeckGravityLoadSet),
+//                ["PodiumGravity"] = T(txtSharedPodiumGravityLoadSet),
+//                ["GroundGravity"] = T(txtSharedGroundGravityLoadSet),
+//                ["BasementGravity"] = T(txtSharedBasementGravityLoadSet),
+//                ["CoreMain"] = T(txtSharedCoreMainLoadSet),
+//                ["PeripheralDeadMain"] = T(txtSharedPeripheralDeadMainLoadSet),
+//                ["PeripheralPortalMain"] = T(txtSharedPeripheralPortalMainLoadSet),
+//                ["InternalMain"] = T(txtSharedInternalMainLoadSet),
 //            };
 //        }
 
@@ -786,18 +779,12 @@
 //        private Dictionary<string, string> GetSlabLoadSetsForFloor(string ft)
 //        {
 //            var result = new Dictionary<string, string>();
-
-//            // Start from defaults so every layer always has a value
 //            foreach (var kv in FloorTypeConfig.DefaultSlabLoadSets)
 //                result[kv.Key] = kv.Value;
-
-//            // Override with whatever the user typed in the UI
-//            if (slabLoadSetTextBoxesPerFloor.TryGetValue(ft, out var txtDict))
-//            {
-//                foreach (var kv in txtDict)
-//                    if (!string.IsNullOrWhiteSpace(kv.Value.Text))
-//                        result[kv.Key] = kv.Value.Text.Trim();
-//            }
+//            // Override with shared values from Load Sets tab
+//            foreach (var kv in sharedSlabLoadSetTextBoxes)
+//                if (!string.IsNullOrWhiteSpace(kv.Value?.Text))
+//                    result[kv.Key] = kv.Value.Text.Trim();
 //            return result;
 //        }
 
@@ -842,11 +829,13 @@
 //            double totalHeight = FloorConfigs.Sum(c => c.Height * c.Count);
 //            var sb = new System.Text.StringBuilder();
 
-//            sb.AppendLine($"{totalStories}F | {totalHeight:F2}m | {SeismicZone}" +
+//            // ── 1d. Include IS code label in the summary header ───────────
+//            string codeLabel = SelectedISCode == WallThicknessCalculator.ISCodeVersion.IS2016
+//                ? "IS 1893:2016" : "IS 1893:2025";
+
+//            sb.AppendLine($"{totalStories}F | {totalHeight:F2}m | {SeismicZone} | {codeLabel}" +
 //                          (chkFoundation.Checked ? $" | Fdn: {FoundationHeight:F2}m" : ""));
 //            sb.AppendLine($"Types: {string.Join(", ", FloorConfigs.Select(c => $"{c.Name}×{c.Count}"))}");
-
-
 
 //            sb.AppendLine("\nFLOORS:");
 //            foreach (var cfg in FloorConfigs)
@@ -892,13 +881,13 @@
 //// END OF PART 1
 //// ============================================================================
 // ============================================================================
-// ============================================================================
 // FILE: UI/ImportConfigForm.cs (PART 1 - Main Form)
 // ============================================================================
 // PURPOSE: Main configuration form class with core logic
-// VERSION: 2.6 — Per-variant gravity width overrides + Slab/Beam load sets UI
+// VERSION: 2.7 — IS 1893 Code Edition selector (2016 / 2025)
 // ============================================================================
 
+using ETAB_Automation.Core;
 using ETAB_Automation.Importers;
 using ETAB_Automation.Models;
 using System;
@@ -916,6 +905,10 @@ namespace ETAB_Automation
 
         public List<FloorTypeConfig> FloorConfigs { get; private set; }
         public string SeismicZone { get; private set; }
+
+        // ── 1a. New public property for selected IS Code ──────────────────
+        public WallThicknessCalculator.ISCodeVersion SelectedISCode { get; private set; }
+
         public List<string> WallGrades { get; private set; }
         public List<int> FloorsPerGrade { get; private set; }
         public double FoundationHeight { get; private set; }
@@ -949,6 +942,9 @@ namespace ETAB_Automation
         internal NumericUpDown numTerraceheight;
         internal NumericUpDown numFoundationHeight;
         internal ComboBox cmbSeismicZone;
+
+        // ── 1b. New ComboBox for IS Code edition ─────────────────────────
+        internal ComboBox cmbISCode;
 
         // Grade schedule
         internal DataGridView dgvGradeSchedule;
@@ -1017,9 +1013,11 @@ namespace ETAB_Automation
         internal Dictionary<string, NumericUpDown> numDGSlabPerFloor;
         internal Dictionary<string, NumericUpDown> numSTPSlabPerFloor;
 
-        // ── SHARED SLAB LOAD SETS (one for all floor plans) ──────────────
+        // ── SHARED SLAB INDIVIDUAL LOADS (one set for all floor plans) ──────
         // Key = short slab key (e.g. "Lobby", "Residential", "Balcony")
-        internal Dictionary<string, TextBox> sharedSlabLoadSetTextBoxes;
+        // Value = 9 NumericUpDown controls for [FF, Fill, ASDL, LL, LL>3,
+        //         FireTender, TreeLoad, MachineRoom, WaterTank]
+        internal Dictionary<string, NumericUpDown[]> sharedSlabIndividualLoadControls;
 
         // ── Per-floor wall thickness overrides ──────────────────────────
         internal Dictionary<string, NumericUpDown> numCoreWallOverridePerFloor;
@@ -1028,12 +1026,7 @@ namespace ETAB_Automation
         internal Dictionary<string, NumericUpDown> numInternalWallOverridePerFloor;
         internal Dictionary<string, NumericUpDown> numNtaWallThicknessPerFloor;
 
-
-
-        // ── A) ADD two dict declarations alongside the other per-floor dicts ─────────
-        // (place after numNtaWallThicknessPerFloor declaration, ~line 934)
-
-        //   // ── Per-floor COLUMN dimensions (B × D) ─────────────────────────────
+        // ── Per-floor COLUMN dimensions (B × D) ─────────────────────────────
         internal Dictionary<string, NumericUpDown> numColumnBPerFloor;
         internal Dictionary<string, NumericUpDown> numColumnDPerFloor;
 
@@ -1090,8 +1083,8 @@ namespace ETAB_Automation
             numInternalMainWidthOverridePerFloor = new Dictionary<string, NumericUpDown>();
 
             // Beam wall load set dicts
-            // Shared load set TextBoxes — created by InitializeLoadSetsTab()
-            sharedSlabLoadSetTextBoxes = new Dictionary<string, TextBox>();
+            // Shared slab individual load controls — created by InitializeLoadSetsTab()
+            sharedSlabIndividualLoadControls = new Dictionary<string, NumericUpDown[]>();
 
             // Slab thickness dicts
             numLobbySlabThicknessPerFloor = new Dictionary<string, NumericUpDown>();
@@ -1105,7 +1098,7 @@ namespace ETAB_Automation
             numDGSlabPerFloor = new Dictionary<string, NumericUpDown>();
             numSTPSlabPerFloor = new Dictionary<string, NumericUpDown>();
 
-            // sharedSlabLoadSetTextBoxes initialized above
+            // sharedSlabIndividualLoadControls initialized above
 
             // Wall override dicts
             numCoreWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
@@ -1114,11 +1107,9 @@ namespace ETAB_Automation
             numInternalWallOverridePerFloor = new Dictionary<string, NumericUpDown>();
             numNtaWallThicknessPerFloor = new Dictionary<string, NumericUpDown>();
 
-            // column data
-
+            // Column data
             numColumnBPerFloor = new Dictionary<string, NumericUpDown>();
             numColumnDPerFloor = new Dictionary<string, NumericUpDown>();
-
 
             InitializeControlsUI();
         }
@@ -1388,6 +1379,12 @@ namespace ETAB_Automation
                 if (!CollectFloorConfigs()) return;
 
                 SeismicZone = cmbSeismicZone.SelectedItem?.ToString() ?? "Zone IV (Ahmedabad & Kolkata)";
+
+                // ── 1c. Capture the selected IS code ─────────────────────
+                SelectedISCode = (cmbISCode.SelectedIndex == 0)
+                    ? WallThicknessCalculator.ISCodeVersion.IS2016
+                    : WallThicknessCalculator.ISCodeVersion.IS2025;
+
                 FoundationHeight = chkFoundation.Checked ? (double)numFoundationHeight.Value : 0;
 
                 ShowConfirmation();
@@ -1546,14 +1543,13 @@ namespace ETAB_Automation
                 BasementNumber = bNum,
                 IsIndividualPodium = isPodium,
                 PodiumNumber = pNum,
-                //IsRefuge = name == "Refuge",
                 CADFilePath = cadPathTextBoxes[name].Text,
                 LayerMapping = GetLayerMapping(name),
                 BeamDepths = GetBeamDepthsForFloor(name),
                 BeamWidthOverrides = GetBeamWidthOverridesForFloor(name),
                 BeamWallLoadSets = GetBeamWallLoadSetsForFloor(name),
                 SlabThicknesses = GetSlabThicknessesForFloor(name),
-                SlabLoadSets = GetSlabLoadSetsForFloor(name),
+                SlabIndividualLoads = GetSlabIndividualLoadsForFloor(name),
                 WallThicknessOverrides = GetWallThicknessOverridesForFloor(name),
                 NtaWallThickness = (int)numNtaWallThicknessPerFloor[name].Value,
                 ColumnB = numColumnBPerFloor.ContainsKey(name) ? (int)numColumnBPerFloor[name].Value : 300,
@@ -1660,19 +1656,32 @@ namespace ETAB_Automation
         }
 
         /// <summary>
-        /// Collects ETABS load pattern names for all slab layers on this floor type.
-        /// Reads from the slabLoadSetTextBoxesPerFloor dict-of-dicts populated in the UI.
-        /// Falls back to FloorTypeConfig.DefaultSlabLoadSets if the UI dict has no entry.
+        /// Collects individual load-pattern magnitudes for all slab layers.
+        /// Reads from sharedSlabIndividualLoadControls populated in the Load Sets tab.
+        /// Falls back to FloorTypeConfig.DefaultSlabIndividualLoads if no UI entry.
         /// </summary>
-        private Dictionary<string, string> GetSlabLoadSetsForFloor(string ft)
+        private Dictionary<string, SlabLoads> GetSlabIndividualLoadsForFloor(string ft)
         {
-            var result = new Dictionary<string, string>();
-            foreach (var kv in FloorTypeConfig.DefaultSlabLoadSets)
+            var result = new Dictionary<string, SlabLoads>();
+            // Seed defaults
+            foreach (var kv in FloorTypeConfig.DefaultSlabIndividualLoads)
                 result[kv.Key] = kv.Value;
-            // Override with shared values from Load Sets tab
-            foreach (var kv in sharedSlabLoadSetTextBoxes)
-                if (!string.IsNullOrWhiteSpace(kv.Value?.Text))
-                    result[kv.Key] = kv.Value.Text.Trim();
+            // Override with user-edited controls from Load Sets tab
+            foreach (var kv in sharedSlabIndividualLoadControls)
+            {
+                var c = kv.Value; // [FF, Fill, ASDL, LL, LL>3, FireTender, Tree, Machine, WaterTank]
+                result[kv.Key] = new SlabLoads(
+                    (double)c[0].Value,  // FF
+                    (double)c[1].Value,  // Filling
+                    (double)c[2].Value,  // ASDL
+                    (double)c[3].Value,  // LL
+                    (double)c[4].Value,  // LL3
+                    (double)c[5].Value,  // FireTender
+                    (double)c[6].Value,  // TreeLoad
+                    (double)c[7].Value,  // MachineRoom
+                    (double)c[8].Value   // WaterTank
+                );
+            }
             return result;
         }
 
@@ -1717,11 +1726,13 @@ namespace ETAB_Automation
             double totalHeight = FloorConfigs.Sum(c => c.Height * c.Count);
             var sb = new System.Text.StringBuilder();
 
-            sb.AppendLine($"{totalStories}F | {totalHeight:F2}m | {SeismicZone}" +
+            // ── 1d. Include IS code label in the summary header ───────────
+            string codeLabel = SelectedISCode == WallThicknessCalculator.ISCodeVersion.IS2016
+                ? "IS 1893:2016" : "IS 1893:2025";
+
+            sb.AppendLine($"{totalStories}F | {totalHeight:F2}m | {SeismicZone} | {codeLabel}" +
                           (chkFoundation.Checked ? $" | Fdn: {FoundationHeight:F2}m" : ""));
             sb.AppendLine($"Types: {string.Join(", ", FloorConfigs.Select(c => $"{c.Name}×{c.Count}"))}");
-
-
 
             sb.AppendLine("\nFLOORS:");
             foreach (var cfg in FloorConfigs)

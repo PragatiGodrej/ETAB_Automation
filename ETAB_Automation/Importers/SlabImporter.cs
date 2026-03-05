@@ -1,5 +1,7 @@
 ﻿
 
+
+
 //// ============================================================================
 //// FILE: Importers/SlabImporterEnhanced.cs
 //// ============================================================================
@@ -216,25 +218,33 @@
 //                "FACADE",
 //                "BALCONY",
 //                "CHAJJA",
+//                "CHAJJA+ODU",
 //                "SOCIETY ROOM",
 //                "DRIVEWAY",
-//                "GARDEN/DINING AREA",
+//                "GARDEN DINING",
 //                "GYMNASIUM",
 //                "INDOOR SPORTS",
-//                "KITCHEN SUNK",
+//                "KITCHEN SINK",
 //                "LMR",
+//                "LMR TOP",
 //                "LOBBY",
 //                "METER ROOM",
 //                "MULTIPURPOSE HALL",
 //                "OHT",
+//                "OHT TOP",
 //                "PARKING",
+//                "PARKING TOILET",
 //                "REFUGE",
 //                "RESIDENTIAL",
 //                "RETAIL",
+//                "RETAIL MAZZANINE",
+//                "RETAIL TOILET",
 //                "SERVICE SLAB",
 //                "STACK PARKING",
 //                "STAIRCASE",
 //                "TERRACE",
+//                "TERRACE FIRE TANK",
+//                "TERRACE PUMP ROOM",
 //                "TOILET",
 //                "UTILITY",
 //                "AMENITIES",
@@ -246,17 +256,7 @@
 //                "FIRE TENDER",
 //                "WATER TANK",
 //                "PUMP ROOM",
-//                "LMR TOP",
-//                "OHT TOP",
-//                "TERRACE FIRE TANK",
-//                "TERRACE PUMP ROOM",
-//                "PARKING TOILET",
-//                "RETAIL TOILET",
-//                "RETAIL MAZZANINE",
 //                "GARBAGE ROOM",
-//                "GARDEN DINING",
-//                "INDOOR SPORTS",
-//                "KITCHEN SINK",
 //            };
 
 //            System.Diagnostics.Debug.WriteLine(
@@ -943,7 +943,6 @@
 //    }
 //}
 
-
 // ============================================================================
 // FILE: Importers/SlabImporterEnhanced.cs
 // ============================================================================
@@ -993,7 +992,9 @@ namespace ETABS_CAD_Automation.Importers
         private readonly cSapModel sapModel;
         private readonly DxfDocument dxfDoc;
         private readonly Dictionary<string, int> slabConfig;
-        private readonly Dictionary<string, string> slabLoadSets; // from UI
+        // Per-layer individual load magnitudes (kN/m²) from UI
+        // Key = pascal slab key (e.g. "Residential"), Value = SlabLoads
+        private readonly Dictionary<string, SlabLoads> slabLoadData;
         private readonly GradeScheduleManager gradeSchedule;
 
         private const double MM_TO_M = 0.001;
@@ -1015,21 +1016,7 @@ namespace ETABS_CAD_Automation.Importers
             public string Grade { get; set; }
         }
 
-        // ====================================================================
-        // UNIFORM LOAD SET CACHE  (instance — re-read for every new session)
-        //
-        // These are the sets visible under:
-        //   Assign > Shell Loads > Uniform Load Set
-        // (e.g. BALCONY, LOBBY, RESIDENTIAL, CHAJJA …)
-        //
-        // Retrieved via: sapModel.LoadSets.GetNameList(ref n, ref names)
-        // Assigned via : sapModel.AreaObj.SetLoadUniform(areaName, setName, value, dir, ...)
-        //
-        // Key   = UPPERCASE set name
-        // Value = exact name as stored in ETABS
-        // ====================================================================
-
-        private Dictionary<string, string> etabsUniformLoadSets;
+        // (Uniform Load Set cache removed — loads are now assigned per-pattern directly)
 
         // ====================================================================
         // THICKNESS RULES
@@ -1100,12 +1087,12 @@ namespace ETABS_CAD_Automation.Importers
             DxfDocument doc,
             Dictionary<string, int> config = null,
             GradeScheduleManager gradeManager = null,
-            Dictionary<string, string> loadSets = null)
+            Dictionary<string, SlabLoads> loadData = null)
         {
             sapModel = model;
             dxfDoc = doc;
             gradeSchedule = gradeManager;
-            slabLoadSets = loadSets ?? new Dictionary<string, string>();
+            slabLoadData = loadData ?? new Dictionary<string, SlabLoads>();
 
             slabConfig = config ?? new Dictionary<string, int>
             {
@@ -1122,136 +1109,27 @@ namespace ETABS_CAD_Automation.Importers
             };
 
             LoadAvailableSlabSections();
-            LoadEtabsUniformLoadSets();   // ← replaces LoadEtabsLoadPatterns()
         }
 
         // ====================================================================
-        // STEP 1 — Build Uniform Load Set registry
-        //
-        // ETABS API LIMITATION: There is NO API method to retrieve the list of
-        // Uniform Load Sets (shown in Assign > Shell Loads > Uniform Load Set).
-        // sapModel.LoadSets does NOT exist in ETABSv1.
-        //
-        // Solution: We seed from the known set names visible in your ETABS model
-        // template (from the UI screenshot), then attempt runtime discovery by
-        // reading back any already-assigned loads from existing area objects.
-        //
-        // The assignment API (AreaObj.SetLoadUniform) accepts the Uniform Load
-        // Set name exactly as it appears in the ETABS dialog — so as long as the
-        // name matches, the call succeeds even without pre-validation.
-        //
-        // Strategy:
-        //   1. Seed with all known Uniform Load Set names from your template.
-        //   2. Accept any user-supplied name from UI (slabLoadSets dict) as-is.
-        //   3. If SetLoadUniform returns non-zero, log a warning.
+        // LOAD PATTERN MAP
+        // Maps SlabLoads field name → ETABS load pattern name
+        // These load patterns must exist in the ETABS model.
         // ====================================================================
 
-        private void LoadEtabsUniformLoadSets()
-        {
-            etabsUniformLoadSets = new Dictionary<string, string>(
-                StringComparer.OrdinalIgnoreCase);
-
-            // ── Seed with known Uniform Load Set names from ETABS template ──
-            // These match exactly what is shown in:
-            //   Assign > Shell Loads > Uniform Load Set dialog
-            // Add or remove names here to match your specific model template.
-            var knownSets = new[]
+        private static readonly Dictionary<string, string> LoadPatternNames
+            = new Dictionary<string, string>
             {
-                "FACADE",
-                "BALCONY",
-                "CHAJJA",
-                "CHAJJA+ODU",
-                "SOCIETY ROOM",
-                "DRIVEWAY",
-                "GARDEN DINING",
-                "GYMNASIUM",
-                "INDOOR SPORTS",
-                "KITCHEN SINK",
-                "LMR",
-                "LMR TOP",
-                "LOBBY",
-                "METER ROOM",
-                "MULTIPURPOSE HALL",
-                "OHT",
-                "OHT TOP",
-                "PARKING",
-                "PARKING TOILET",
-                "REFUGE",
-                "RESIDENTIAL",
-                "RETAIL",
-                "RETAIL MAZZANINE",
-                "RETAIL TOILET",
-                "SERVICE SLAB",
-                "STACK PARKING",
-                "STAIRCASE",
-                "TERRACE",
-                "TERRACE FIRE TANK",
-                "TERRACE PUMP ROOM",
-                "TOILET",
-                "UTILITY",
-                "AMENITIES",
-                "UGT",
-                "LANDSCAPE",
-                "SWIMMING",
-                "DG",
-                "STP",
-                "FIRE TENDER",
-                "WATER TANK",
-                "PUMP ROOM",
-                "GARBAGE ROOM",
+                ["FF"] = "FLOOR FINISH",
+                ["Filling"] = "FILLING",
+                ["ASDL"] = "ASDL",
+                ["LL"] = "LL",
+                ["LL3"] = "LL>3",
+                ["FireTender"] = "FIRE TENDER",
+                ["TreeLoad"] = "TREE LOAD",
+                ["MachineRoom"] = "MACHINE ROOM",
+                ["WaterTank"] = "WATER TANK",
             };
-
-            System.Diagnostics.Debug.WriteLine(
-                $"\n===== UNIFORM LOAD SETS (seeded from template) — {knownSets.Length} entries =====");
-
-            foreach (var name in knownSets)
-            {
-                etabsUniformLoadSets[name.ToUpperInvariant()] = name;
-                System.Diagnostics.Debug.WriteLine($"  ULS: '{name}'");
-            }
-
-            System.Diagnostics.Debug.WriteLine(
-                "=======================================================================\n");
-
-            // ── Also add any names supplied from the UI dict directly ───────
-            // This ensures user-typed custom names always pass through.
-            foreach (var kv in slabLoadSets)
-            {
-                if (!string.IsNullOrWhiteSpace(kv.Value))
-                {
-                    string v = kv.Value.Trim();
-                    etabsUniformLoadSets[v.ToUpperInvariant()] = v;
-                }
-            }
-        }
-
-        // ====================================================================
-        // STEP 2 — Fuzzy-resolve user name → exact ETABS Uniform Load Set name
-        // 1. Exact match (case-insensitive)
-        // 2. Substring match (either direction)
-        // Returns null if nothing found → caller skips assignment.
-        // ====================================================================
-
-        private string ResolveUniformLoadSet(string userSetName)
-        {
-            if (string.IsNullOrWhiteSpace(userSetName)) return null;
-            if (etabsUniformLoadSets == null || etabsUniformLoadSets.Count == 0) return null;
-
-            string u = userSetName.ToUpperInvariant().Trim();
-
-            // 1. Exact
-            if (etabsUniformLoadSets.TryGetValue(u, out string exact)) return exact;
-
-            // 2. Partial
-            foreach (var kv in etabsUniformLoadSets)
-                if (kv.Key.Contains(u) || u.Contains(kv.Key))
-                    return kv.Value;
-
-            System.Diagnostics.Debug.WriteLine(
-                $"  ⚠ SLAB: Uniform Load Set '{userSetName}' not found in ETABS. " +
-                "Check Define > Load Sets > Uniform Load Sets — all set names are listed above.");
-            return null;
-        }
 
         // ====================================================================
         // SECTION LOADING
@@ -1452,84 +1330,87 @@ namespace ETABS_CAD_Automation.Importers
         }
 
         // ====================================================================
-        // GET SLAB UNIFORM LOAD SET NAME FROM UI
-        // Priority: (1) UI slabLoadSets dict  (2) FloorTypeConfig defaults
-        // Maps raw CAD layer name → short key → Uniform Load Set name.
+        // GET SLAB LOADS FOR LAYER
+        // Maps CAD layer name → pascal key → SlabLoads from UI or defaults.
         // ====================================================================
 
-        private string GetSlabLoadSetName(string layerName)
+        private SlabLoads GetSlabLoadsForLayer(string layerName)
         {
-            // Strip "S-" prefix
-            string stripped = layerName.Trim();
-            if (stripped.StartsWith("S-", StringComparison.OrdinalIgnoreCase))
-                stripped = stripped.Substring(2).Trim();
+            string key = NormaliseToPascalKey(layerName);
 
-            // 1. Exact match in UI dict (case-insensitive key)
-            foreach (var kv in slabLoadSets)
-                if (string.Equals(kv.Key, stripped, StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(kv.Value))
-                    return kv.Value.Trim();
+            // 1. Check UI-supplied loads (from sharedSlabLoadControls via constructor)
+            if (slabLoadData.TryGetValue(key, out SlabLoads ui) && ui != null)
+                return ui;
 
-            // 2. PascalCase normalisation → FloorTypeConfig default table
-            string pascalKey = NormaliseToPascalKey(stripped);
-            if (FloorTypeConfig.DefaultSlabLoadSets.TryGetValue(pascalKey, out string def)
-                && !string.IsNullOrWhiteSpace(def))
-                return def.Trim();
+            // 2. Fall back to defaults
+            if (FloorTypeConfig.DefaultSlabLoads.TryGetValue(key, out SlabLoads def) && def != null)
+                return def.Clone();
 
-            // 3. Layer name itself uppercased (last resort)
-            return stripped.ToUpperInvariant();
+            System.Diagnostics.Debug.WriteLine(
+                $"  ⚠ SLAB: No load data found for layer '{layerName}' (key='{key}'). " +
+                "Using ASDL=1.0 minimum default.");
+            return new SlabLoads(0, 0, 1, 0);
         }
 
         // ====================================================================
         // NORMALISE CAD LAYER FRAGMENT → PASCAL KEY
-        // Matches keys in FloorTypeConfig.DefaultSlabLoadSets.
         // ====================================================================
 
-        private static string NormaliseToPascalKey(string s)
+        private static string NormaliseToPascalKey(string layerName)
         {
+            // Strip "S-" prefix and any cantilever prefix
+            string s = layerName.Trim();
+            if (s.StartsWith("S-", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(2).Trim();
+
+            // Strip cantilever prefix if present
+            if (s.StartsWith("CANTILEVER ", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(11).Trim();
+            else if (s.StartsWith("CANTILVER ", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(10).Trim();
+
             var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["CANTILEVER BALCONY"] = "Balcony",
-                ["CANTILVER BALCONY"] = "Balcony",
+                ["BALCONY"] = "Balcony",
                 ["BALCONY SLABS"] = "Balcony",
-                ["CANTILEVER CHAJJA"] = "Chajja",
-                ["CANTILEVER CHAJJA+ODU"] = "ChajjaODU",
+                ["CHAJJA"] = "Chajja",
+                ["CHAJJA+ODU"] = "ChajjaODU",
                 ["FIRE TENDER"] = "FireTender",
                 ["FIRE WATER TANK"] = "FireWaterTank",
                 ["GARBAGE ROOM"] = "GarbageRoom",
                 ["GARDEN/DINING AREA"] = "GardenDining",
                 ["GARDEN DINING"] = "GardenDining",
+                ["GYMNASIUM"] = "Gymnasium",
                 ["INDOOR SPORTS"] = "IndoorSports",
-                ["KITCHEN SUNK"] = "KitchenSink",
+                ["KITCHEN SUNK"] = "KitchenSunk",
+                ["KITCHEN"] = "KitchenSunk",
                 ["KITCHEN SINK"] = "KitchenSink",
                 ["LMR TOP"] = "LMRTop",
-                ["LMRTOP"] = "LMRTop",
+                ["LMR"] = "LMR",
+                ["LOBBY"] = "Lobby",
                 ["METER ROOM"] = "MeterRoom",
                 ["MULTIPURPOSE HALL"] = "MultipurposeHall",
                 ["OHT TOP"] = "OHTTop",
+                ["OHT"] = "OHT",
                 ["PARKING TOILET"] = "ParkingToilet",
+                ["PARKING"] = "Parking",
                 ["PUMP ROOM"] = "PumpRoom",
+                ["REFUGE"] = "Refuge",
+                ["RESIDENTIAL"] = "Residential",
                 ["RETAIL MAZZANINE"] = "RetailMazzanine",
                 ["RETAIL TOILET"] = "RetailToilet",
+                ["RETAIL"] = "Retail",
                 ["SERVICE SLAB"] = "ServiceSlab",
                 ["SOCIETY ROOM"] = "SocietyRoom",
                 ["STACK PARKING"] = "StackParking",
                 ["STAIRCASE"] = "Staircase",
                 ["TERRACE FIRE TANK"] = "TerraceFire",
                 ["TERRACE PUMP ROOM"] = "TerracePumpRoom",
-                ["AMENITIES"] = "Amenities",
-                ["DRIVEWAY"] = "Driveway",
-                ["GYMNASIUM"] = "Gymnasium",
-                ["LMR"] = "LMR",
-                ["LOBBY"] = "Lobby",
-                ["OHT"] = "OHT",
-                ["PARKING"] = "Parking",
-                ["REFUGE"] = "Refuge",
-                ["RESIDENTIAL"] = "Residential",
-                ["RETAIL"] = "Retail",
                 ["TERRACE"] = "Terrace",
                 ["TOILET"] = "Toilet",
                 ["UTILITY"] = "Utility",
+                ["AMENITIES"] = "Amenities",
+                ["DRIVEWAY"] = "Driveway",
                 ["UGT"] = "UGT",
                 ["LANDSCAPE"] = "Landscape",
                 ["SWIMMING"] = "Swimming",
@@ -1541,8 +1422,7 @@ namespace ETABS_CAD_Automation.Importers
             if (map.TryGetValue(u, out string mapped)) return mapped;
 
             // Auto-pascal fallback
-            var parts = s.Split(new[] { ' ', '-', '_' },
-                StringSplitOptions.RemoveEmptyEntries);
+            var parts = s.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
             return string.Concat(parts.Select(p =>
                 p.Length > 0
                     ? char.ToUpperInvariant(p[0]) + p.Substring(1).ToLowerInvariant()
@@ -1601,11 +1481,11 @@ namespace ETABS_CAD_Automation.Importers
                 System.Diagnostics.Debug.WriteLine(
                     $"  Created: {createdNames.Count} slab(s)");
 
-                // ── Uniform Load Set assignment (only after creation confirmed) ──
+                // ── Individual load pattern assignment ─────────────────────
                 if (createdNames.Count > 0)
                 {
-                    string userSetName = GetSlabLoadSetName(layerName);
-                    AssignSlabUniformLoadSets(createdNames, userSetName, layerName);
+                    SlabLoads loads = GetSlabLoadsForLayer(layerName);
+                    AssignIndividualLoads(createdNames, loads, layerName);
                 }
             }
 
@@ -1613,88 +1493,92 @@ namespace ETABS_CAD_Automation.Importers
                 $"\n  Slabs story {story}: ✓{ok}  ❌{fail}  ⊘{skip}\n");
         }
 
-        //, string CSys,
-        //                      eItemType ItemType)
+        // ====================================================================
+        // ASSIGN INDIVIDUAL LOAD PATTERNS
+        // Each non-zero field in SlabLoads is assigned to its own ETABS
+        // load pattern via AreaObj.SetLoadUniform().
         //
-        // CRITICAL DISTINCTION:
-        //   • Beams   → use LoadPatterns (DL, LL, WALL LOAD …)
-        //   • Slabs   → use Uniform Load Sets (BALCONY, LOBBY, RESIDENTIAL …)
-        //               retrieved via sapModel.LoadSets.GetNameList()
-        //               assigned via the same SetLoadUniform call but with
-        //               the Uniform Load Set name as "LoadPat" argument.
-        //
-        // Dir = 6 → Global -Z (Gravity downward)
-        //           (Dir 4 = Global X, 5 = Global Y, 6 = Global Z / gravity)
-        //
-        // Value = 1.0 because the Uniform Load Set already stores its own
-        //         kN/m² magnitude defined in Define > Load Sets > Uniform Load Sets.
+        // Dir = 6 → Global -Z (Gravity downward, global coordinate system)
+        // CSys = "Global"
+        // Replace = true (first call); subsequent calls within same layer
+        //           use Replace = false so prior patterns are not wiped.
         // ====================================================================
 
-        private void AssignSlabUniformLoadSets(List<string> areaNames,
-            string userSetName, string layerName)
+        private void AssignIndividualLoads(List<string> areaNames,
+            SlabLoads loads, string layerName)
         {
-            if (string.IsNullOrWhiteSpace(userSetName))
+            if (loads == null)
             {
                 System.Diagnostics.Debug.WriteLine(
-                    $"  ⊘ No Uniform Load Set name for layer '{layerName}' — skipping.");
+                    $"  ⊘ No load data for layer '{layerName}' — skipping.");
                 return;
             }
 
-            // Resolve user-typed name → exact ETABS Uniform Load Set name
-            string resolvedSetName = ResolveUniformLoadSet(userSetName);
-            if (resolvedSetName == null)
+            // Build list of (patternName, value) pairs — skip zero values
+            var assignments = new List<(string pattern, double value)>
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"  ⚠ Uniform Load Set '{userSetName}' not found in ETABS " +
-                    "(see Define > Load Sets > Uniform Load Sets). Skipping.");
-                return;
-            }
+                ("FLOOR FINISH", loads.FF),
+                ("FILLING",      loads.Filling),
+                ("ASDL",         loads.ASDL),
+                ("LL",           loads.LL),
+                ("LL>3",         loads.LL3),
+                ("FIRE TENDER",  loads.FireTender),
+                ("TREE LOAD",    loads.TreeLoad),
+                ("MACHINE ROOM", loads.MachineRoom),
+                ("WATER TANK",   loads.WaterTank),
+            };
 
             System.Diagnostics.Debug.WriteLine(
-                $"  → Assigning Uniform Load Set '{resolvedSetName}' to {areaNames.Count} slab(s)");
+                $"  → Assigning individual loads to {areaNames.Count} slab(s) on layer '{layerName}':");
 
-            int assigned = 0, failed = 0;
-            foreach (string name in areaNames)
+            foreach (var (pattern, value) in assignments)
             {
-                try
-                {
-                    // SetLoadUniform assigns a uniform pressure load to a shell
-                    // using a Uniform Load Set name.
-                    // Dir 2 = Local -Z = perpendicular to shell surface downward.
-                    // CSys "Local" — matches official ETABS API documentation example.
-                    // Value = 1.0 because the Uniform Load Set already stores its
-                    // own kN/m² magnitude (set via Define > Load Sets > Uniform Load Sets).
-                    int ret = sapModel.AreaObj.SetLoadUniform(
-                        name,               // area object name
-                        resolvedSetName,    // Uniform Load Set name (exact from ETABS dialog)
-                        1.0,                // multiplier — Load Set stores actual kN/m²
-                        2,                  // Dir: 2 = Local -Z (gravity, perpendicular to shell)
-                        true,               // Replace existing loads
-                        "Local");           // coordinate system — per official API docs
+                if (value <= 0) continue;
 
-                    if (ret == 0)
+                System.Diagnostics.Debug.WriteLine(
+                    $"    [{pattern}] = {value:F2} kN/m²");
+
+                int assigned = 0, failed = 0;
+                bool firstPattern = (pattern == "FLOOR FINISH");
+
+                foreach (string areaName in areaNames)
+                {
+                    try
                     {
-                        assigned++;
-                        System.Diagnostics.Debug.WriteLine(
-                            $"    ✓ '{resolvedSetName}' → slab '{name}'");
+                        // Dir 6 = Global -Z (gravity down)
+                        // Replace = true only for first pattern per slab,
+                        // otherwise set to false to accumulate multiple patterns.
+                        int ret = sapModel.AreaObj.SetLoadUniform(
+                            areaName,       // area object name
+                            pattern,        // ETABS load pattern name
+                            value,          // kN/m² magnitude
+                            4,              // Dir: 6 = Global -Z (gravity)
+                            firstPattern,   // Replace existing loads on first pattern
+                            "Global");      // coordinate system
+
+                        if (ret == 0) assigned++;
+                        else
+                        {
+                            failed++;
+                            System.Diagnostics.Debug.WriteLine(
+                                $"      ⚠ SetLoadUniform ret={ret} for slab '{areaName}' " +
+                                $"(pattern: '{pattern}', value: {value:F2})");
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
                         failed++;
                         System.Diagnostics.Debug.WriteLine(
-                            $"    ⚠ SetLoadUniform ret={ret} for slab '{name}' " +
-                            $"(Load Set: '{resolvedSetName}')");
+                            $"      ⚠ SetLoadUniform exception for '{areaName}' " +
+                            $"[{pattern}]: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
-                {
-                    failed++;
-                    System.Diagnostics.Debug.WriteLine(
-                        $"    ⚠ SetLoadUniform exception for '{name}': {ex.Message}");
-                }
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"      ✓{assigned} assigned  ✗{failed} failed");
+
+                firstPattern = false; // Only replace on very first pattern
             }
-            System.Diagnostics.Debug.WriteLine(
-                $"  Uniform Load Set '{resolvedSetName}': ✓{assigned} assigned  ✗{failed} failed");
         }
 
         // ====================================================================
