@@ -1,31 +1,46 @@
 ﻿
 
+//// ============================================================================
+//// FILE: Core/StoryManager.cs — VERSION 6.2
+////
+//// ELEVATION MODEL (definitive):
+////
+////   Height shift is now handled in MainForm BEFORE calling this method.
+////   storyHeights[] passed in are already the correct ETABS heights.
+////
+////   This method simply stacks stories from 0 using storyHeights[] as-is.
+////   geometry = ETABS span exactly for every story.
+////
+////   ONLY EXCEPTION — Basement with foundationHeight > 0:
+////     geomBase = 0.0  (walls/foundation start at absolute base)
+
 // ============================================================================
-// FILE: Core/StoryManager.cs — VERSION 6.2
+// FILE: Core/StoryManager.cs — VERSION 6.5
 //
 // ELEVATION MODEL (definitive):
 //
-//   Height shift is now handled in MainForm BEFORE calling this method.
+//   Height shift is handled in MainForm BEFORE calling this method.
 //   storyHeights[] passed in are already the correct ETABS heights.
 //
-//   This method simply stacks stories from 0 using storyHeights[] as-is.
-//   geometry = ETABS span exactly for every story.
+//   BASEMENT STACKING (multi-basement fix v6.5):
+//     With N basements the sequence is bottom→top: BasementN, ..., Basement1
+//     Only the DEEPEST basement (first in the list, idx=0) starts at geomBase=0.
+//     Each subsequent basement stacks on top of the previous one.
 //
-//   ONLY EXCEPTION — Basement with foundationHeight > 0:
-//     geomBase = 0.0  (walls/foundation start at absolute base)
-//     geomTop  = foundationHeight + userWallHeight
-//     (CADImporter draws: foundation walls 0→fdn, basement walls fdn→geomTop)
-//     storyTopElevations[basement] = foundationHeight + originalWallHeight
+//     Example: foundationHeight=1.5, 3 basements of 3.5m each
+//       idx=0 Basement3: geomBase=0.0       geomTop=0.0 +1.5+3.5= 5.0m
+//       idx=1 Basement2: geomBase=5.0       geomTop=5.0      +3.5= 8.5m
+//       idx=2 Basement1: geomBase=8.5       geomTop=8.5      +3.5=12.0m
+//       idx=3 Ground:    geomBase=12.0      geomTop=12.0     +4.0=16.0m
 //
-//   For CADImporter to know the original basement wall height, StoryManager
-//   stores it via foundationHeight property. CADImporter computes:
-//     basementWallHeight = geomTop - foundationHeight
+//     CADImporter two-part wall treatment applies ONLY to idx=0 (deepest basement).
+//     Basement2, Basement1 → normal wall treatment (geomBase→geomTop, no foundation split).
 //
-// CHANGES from v6.1:
-//   - No shift logic here — MainForm handles it
-//   - All stories: etabsHeight = storyHeights[i] (simple pass-through)
-//   - Basement geomTop = foundationHeight + storyHeights[i] (for full wall drawing)
-//   - Basement geomBase = 0.0
+// CHANGES from v6.4:
+//   - Basement geomBase/geomTop now stack correctly for multi-basement buildings.
+//   - Introduced basementStackTop to track running top of the basement column.
+//   - isDeepestBasement flag (i==0 && isBasement) controls foundation-zone geometry.
+//   - Normal basements (not deepest) use basementStackTop as geomBase.
 // ============================================================================
 
 using ETABSv1;
@@ -106,15 +121,22 @@ namespace ETAB_Automation.Core
             int[] colors = new int[numStories];
 
             double etabsCumulative = 0.0;
-            double rawCumulative = 0.0;   // tracks raw height sum (= total actual building height)
+            double rawCumulative = 0.0;          // all floors including basements
+            double nonBasementRawCumul = 0.0;    // only non-basement floors above basements
 
-            System.Diagnostics.Debug.WriteLine("\n========== STORY ELEVATIONS (v6.4) ==========");
+            // basementStackTop: running top of the stacked basement column (m).
+            // After all basements are processed this equals the physical top of
+            // the shallowest basement slab — normal stories stack from here.
+            double basementStackTop = 0.0;
+
+            System.Diagnostics.Debug.WriteLine("\n========== STORY ELEVATIONS (v6.5) ==========");
             System.Diagnostics.Debug.WriteLine("ETABS Base: 0.000m");
 
             for (int i = 0; i < numStories; i++)
             {
                 bool isBasement = storyNames[i].StartsWith("Basement",
                     StringComparison.OrdinalIgnoreCase);
+                bool isDeepestBasement = (i == 0 && isBasement);
 
                 names[i] = storyNames[i];
                 master[i] = true;
@@ -128,28 +150,42 @@ namespace ETAB_Automation.Core
                 double geomBase, geomTop;
 
                 bool isFirstStoryNoBasement = (i == 0 && !isBasement && foundationHeight > 0);
-                if ((isBasement || isFirstStoryNoBasement) && foundationHeight > 0)
+
+                if (foundationHeight > 0 && isDeepestBasement)
                 {
-                    // Basement: starts at absolute 0, top = foundation zone + wall height
+                    // ── Deepest basement only ────────────────────────────────
+                    // Foundation zone: Z=0 → foundationHeight (Step A in CADImporter)
+                    // Basement walls:  Z=foundationHeight → geomTop (Step B)
                     geomBase = 0.0;
                     geomTop = foundationHeight + rawHeights[i];
+                    basementStackTop = geomTop;
+                }
+                else if (foundationHeight > 0 && isBasement)
+                {
+                    // ── Shallower basements ──────────────────────────────────
+                    // Stack directly on top of previous basement.
+                    // CADImporter treats these as normal-height walls (no foundation split).
+                    geomBase = basementStackTop;
+                    geomTop = basementStackTop + rawHeights[i];
+                    basementStackTop = geomTop;
+                }
+                else if (isFirstStoryNoBasement)
+                {
+                    // ── No basements, but foundation exists ──────────────────
+                    // First story gets the foundation-zone split treatment.
+                    geomBase = 0.0;
+                    geomTop = foundationHeight + rawHeights[i];
+                    basementStackTop = geomTop;
                 }
                 else
                 {
-                    // Normal stories: geomBase/geomTop use rawCumulative so walls
-                    // physically span the correct user-defined height.
-                    // physicalBase = foundationHeight + rawCumulative (slab below this story)
-                    // geomTop      = physicalBase + rawHeights[i]    (slab of this story)
-                    //
-                    // Example: fdn=1.5, rawHeights=[3.5, 4.5, 4.0, 3.0]
-                    //   Podium:  rawCum=3.5  physBase=5.0  geomTop=9.5   PlanZ=5.0  slab@5.0
-                    //   Ground:  rawCum=8.0  physBase=9.5  geomTop=13.5  PlanZ=9.5  slab@9.5
-                    //   Terrace: rawCum=12.0 physBase=13.5 geomTop=16.5  PlanZ=13.5 slab@13.5
-                    double physicalBase = (foundationHeight > 0)
-                        ? foundationHeight + rawCumulative
-                        : rawCumulative;
+                    // ── Normal stories (Ground, Podium, EDeck, Typical, Terrace) ──
+                    // physicalBase = top of basement stack + sum of non-basement
+                    // raw heights already processed.
+                    double physicalBase = basementStackTop + nonBasementRawCumul;
                     geomBase = physicalBase;
                     geomTop = physicalBase + rawHeights[i];
+                    nonBasementRawCumul += rawHeights[i];
                 }
 
                 elevs[i] = etabsHeight;
@@ -158,7 +194,7 @@ namespace ETAB_Automation.Core
                 storyTopElevations[i] = geomTop;
                 etabsCumulative += etabsHeight;
                 rawCumulative += rawHeights[i];
-                planViewElevations[i] = etabsCumulative;   // Plan View Z = cumulative ETABS height
+                planViewElevations[i] = etabsCumulative;
 
                 System.Diagnostics.Debug.WriteLine(
                     $"Story {i}: {storyNames[i].PadRight(14)} | " +

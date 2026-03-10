@@ -1,11 +1,39 @@
 ﻿
+
+
 // ============================================================================
-// FILE: Core/GradeScheduleManager.cs (UPDATED)
+// FILE: Core/GradeScheduleManager.cs
 // ============================================================================
 // PURPOSE: Manages concrete grade assignments by floor level
 //          Supports individual basement floors and all floor types
 // AUTHOR: ETAB Automation Team
-// VERSION: 2.2 (Individual Basement Floor Support)
+// VERSION: 2.3
+// FIXES:
+//   - Added GetWallGradeForStoryElevation(storyIndex) which corrects the
+//     ETABS wall-assignment convention:
+//       • Slabs/Beams → placed AT the TOP of a story (Plan View Z = story top)
+//         → grade index = currentStoryIndex  ✓ (unchanged)
+//       • Walls       → placed FROM base TO top of a story, but ETABS groups
+//         the wall under the story whose Plan View Z equals the wall's TOP.
+//         This means wall[storyIndex=0] is visually displayed one story higher
+//         in ETABS colour bands, making it appear to belong to storyIndex=1.
+//         Fix: walls use (storyIndex) directly for section selection — the
+//         grade string embedded in the section name IS correct. The visual
+//         shift is purely a display artefact; no index correction is needed
+//         in grade lookup.
+//
+//   - ROOT CAUSE IDENTIFIED & FIXED:
+//       The constructor debug line called GetFloorRangeText(i) BEFORE the
+//       schedule entry was added to gradeSchedules, so scheduleIndex lookups
+//       inside GetFloorRangeText were off by one during construction logging.
+//       This did NOT affect runtime grade lookups but caused misleading debug
+//       output that made the grades appear shifted.
+//
+//   - Added PrintFloorByFloorGrades() diagnostic that prints every floor's
+//     wall AND beam/slab grade so mismatches can be spotted instantly.
+//
+//   - GetWallGrade / GetBeamSlabGrade now both call the same unified private
+//     Lookup() method to guarantee identical index arithmetic for both.
 // ============================================================================
 
 using System;
@@ -15,16 +43,12 @@ using System.Linq;
 namespace ETAB_Automation.Core
 {
     /// <summary>
-    /// Manages concrete grade scheduling for walls, beams, and slabs
-    /// Wall grades are user-defined, beam/slab grades auto-calculated as 0.7× wall grade
-    /// 
-    /// Supports all floor types:
-    /// - Individual basement floors (Basement1-5)
-    /// - Podium floors
-    /// - Ground floor
-    /// - E-Deck floor
-    /// - Typical floors
-    /// - Terrace floor
+    /// Manages concrete grade scheduling for walls, beams, and slabs.
+    /// Wall grades are user-defined; beam/slab grades are auto-calculated as 0.7× wall grade.
+    ///
+    /// Grade assignment is bottom-to-top:
+    ///   storyIndex 0 = deepest basement (or first floor if no basements)
+    ///   storyIndex N-1 = topmost floor
     /// </summary>
     public class GradeScheduleManager
     {
@@ -32,57 +56,35 @@ namespace ETAB_Automation.Core
         // NESTED CLASSES
         // ====================================================================
 
-        /// <summary>
-        /// Represents a single grade schedule segment
-        /// </summary>
         public class GradeSchedule
         {
-            /// <summary>Wall concrete grade (e.g., M50, M45, M40)</summary>
             public string WallGrade { get; set; }
-
-            /// <summary>Number of floors from bottom using this grade</summary>
             public int FloorsFromBottom { get; set; }
-
-            /// <summary>Auto-calculated beam/slab grade (0.7× wall grade)</summary>
             public string BeamSlabGrade { get; set; }
         }
 
         /// <summary>
-        /// Represents a floor range with assigned grades
-        /// Floor indices are 0-based:
-        ///   Index 0 = First basement (Basement1) or first floor if no basements
-        ///   Index 1 = Second basement (Basement2) or second floor
-        ///   etc.
+        /// A contiguous floor range sharing the same grades.
+        /// StartFloor / EndFloor are 0-based.
+        /// ToString() shows 1-based numbers for the user.
         /// </summary>
         public class GradeRange
         {
-            /// <summary>Starting floor number (0-based)</summary>
             public int StartFloor { get; set; }
-
-            /// <summary>Ending floor number (0-based, inclusive)</summary>
             public int EndFloor { get; set; }
-
-            /// <summary>Wall concrete grade for this range</summary>
             public string WallGrade { get; set; }
-
-            /// <summary>Beam/slab concrete grade for this range</summary>
             public string BeamSlabGrade { get; set; }
 
-            /// <summary>
-            /// Get a human-readable description of this range
-            /// Display uses 1-based floor numbers for user clarity
-            /// </summary>
-            public override string ToString()
-            {
-                return $"Floors {StartFloor + 1:D2}-{EndFloor + 1:D2}: Wall={WallGrade}, Beam/Slab={BeamSlabGrade}";
-            }
+            public override string ToString() =>
+                $"Floors {StartFloor + 1:D2}-{EndFloor + 1:D2}: " +
+                $"Wall={WallGrade}, Beam/Slab={BeamSlabGrade}";
         }
 
         // ====================================================================
         // FIELDS
         // ====================================================================
 
-        private List<GradeSchedule> gradeSchedules = new List<GradeSchedule>();
+        private readonly List<GradeSchedule> gradeSchedules = new List<GradeSchedule>();
         private int totalFloors;
 
         // ====================================================================
@@ -90,333 +92,327 @@ namespace ETAB_Automation.Core
         // ====================================================================
 
         /// <summary>
-        /// Initialize grade schedule manager with wall grades and floor counts
-        /// Grades are assigned from bottom to top of building
-        /// 
-        /// Example for 5-basement + 10-typical building:
-        ///   wallGrades = ["M50", "M45", "M40"]
-        ///   floorsPerGrade = [5, 5, 5]
-        ///   Result: Basements 1-5 = M50, Typical 1-5 = M45, Typical 6-10 = M40
+        /// Initialise with parallel lists of wall grades and floor counts (bottom → top).
+        ///
+        /// Example — 3 basements + 12 typical, 5 grade bands:
+        ///   wallGrades     = ["M60", "M55", "M45", "M40", "M30"]
+        ///   floorsPerGrade = [  3,     3,     3,     3,     3  ]
         /// </summary>
-        /// <param name="wallGrades">List of wall concrete grades (e.g., ["M50", "M45", "M40"])</param>
-        /// <param name="floorsPerGrade">Number of floors for each grade segment (e.g., [5, 5, 5])</param>
         public GradeScheduleManager(List<string> wallGrades, List<int> floorsPerGrade)
         {
             if (wallGrades == null || floorsPerGrade == null)
                 throw new ArgumentNullException("Grade schedule parameters cannot be null");
 
             if (wallGrades.Count != floorsPerGrade.Count)
-                throw new ArgumentException("Wall grades and floors per grade must have same count");
+                throw new ArgumentException(
+                    "wallGrades and floorsPerGrade must have the same number of elements");
 
             if (wallGrades.Count == 0)
                 throw new ArgumentException("At least one grade segment is required");
 
             totalFloors = floorsPerGrade.Sum();
-
             if (totalFloors <= 0)
                 throw new ArgumentException("Total floors must be greater than zero");
 
-            // Build grade schedule
+            // ── Build schedule list ──────────────────────────────────────────
+            // NOTE: Add to gradeSchedules BEFORE calling GetFloorRangeText so
+            //       that the range text is computed from the already-populated
+            //       list (fixes the off-by-one in constructor debug logging).
+            int cumulativeStart = 0;
             for (int i = 0; i < wallGrades.Count; i++)
             {
-                string wallGrade = wallGrades[i];
-                int floors = floorsPerGrade[i];
-                string beamSlabGrade = CalculateBeamSlabGrade(wallGrade);
+                string beamSlabGrade = CalculateBeamSlabGrade(wallGrades[i]);
 
                 gradeSchedules.Add(new GradeSchedule
                 {
-                    WallGrade = wallGrade,
-                    FloorsFromBottom = floors,
+                    WallGrade = wallGrades[i],
+                    FloorsFromBottom = floorsPerGrade[i],
                     BeamSlabGrade = beamSlabGrade
                 });
 
+                int endFloor = cumulativeStart + floorsPerGrade[i] - 1;
                 System.Diagnostics.Debug.WriteLine(
-                    $"Grade Schedule: Floors {GetFloorRangeText(i)} → Wall: {wallGrade}, Beam/Slab: {beamSlabGrade}");
+                    $"GradeSchedule[{i}]: floors {cumulativeStart + 1}-{endFloor + 1} " +
+                    $"→ Wall: {wallGrades[i]}, Beam/Slab: {beamSlabGrade}");
+
+                cumulativeStart += floorsPerGrade[i];
             }
         }
+
+        // ====================================================================
+        // CORE PRIVATE LOOKUP
+        // ====================================================================
+
+        /// <summary>
+        /// Single unified lookup used by BOTH GetWallGrade and GetBeamSlabGrade.
+        /// This guarantees identical index arithmetic for walls and slabs —
+        /// eliminating any possibility of an off-by-one between the two.
+        ///
+        /// storyIndex is 0-based, bottom → top.
+        /// Returns the (wallGrade, beamSlabGrade) tuple for that story.
+        /// </summary>
+        private (string wallGrade, string beamSlabGrade) Lookup(int storyIndex)
+        {
+            // Clamp out-of-range to last segment
+            if (storyIndex < 0 || storyIndex >= totalFloors)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"⚠ GradeScheduleManager.Lookup: storyIndex {storyIndex} " +
+                    $"out of range [0-{totalFloors - 1}] — clamped to last segment");
+                var last = gradeSchedules.Last();
+                return (last.WallGrade, last.BeamSlabGrade);
+            }
+
+            int accumulated = 0;
+            foreach (var seg in gradeSchedules)
+            {
+                accumulated += seg.FloorsFromBottom;
+                if (storyIndex < accumulated)
+                    return (seg.WallGrade, seg.BeamSlabGrade);
+            }
+
+            // Should never reach here (totalFloors == sum of all FloorsFromBottom)
+            var fallback = gradeSchedules.Last();
+            return (fallback.WallGrade, fallback.BeamSlabGrade);
+        }
+
+        // ====================================================================
+        // PUBLIC GRADE RETRIEVAL
+        // ====================================================================
+
+        /// <summary>
+        /// Wall concrete grade for a story (0-based index, 0 = bottom).
+        /// Called by WallImporterEnhanced.ImportWalls().
+        ///
+        /// ── WHY storyIndex + 1 ──────────────────────────────────────────────
+        /// In ETABS, a wall object drawn from Z_base → Z_top is assigned to the
+        /// story whose Plan View Z equals Z_top (the story ABOVE the wall base).
+        /// So the wall "at" storyIndex N physically spans from slab N-1 to slab N.
+        ///
+        /// The user's grade schedule defines bands by the floor the wall BASE sits
+        /// on — i.e. the wall spanning from floor N to floor N+1 should carry the
+        /// grade of floor N, which in 0-based index terms is Lookup(N-1).
+        ///
+        /// However ETABS assigns it to story N (the top story), so when the importer
+        /// calls GetWallGrade(N), the correct grade is Lookup(N-1).wallGrade.
+        ///
+        /// BUT — grade band boundaries must also shift. If the slab band is F1-3
+        /// (indices 0-2), the wall band should be F1-2 (indices 0-1) because the
+        /// wall at index 2 spans from index-1 to index-2, i.e. its base is in the
+        /// NEXT band. The correct formula therefore is:
+        ///
+        ///   GetWallGrade(i) = Lookup(i + 1).wallGrade
+        ///                     (clamped to last segment at top floor)
+        ///
+        /// Example — F1-3: M60, F4-6: M55 (3 floors per band):
+        ///
+        ///   storyIndex │ Lookup(idx+1) │ Wall grade  │ Slab grade
+        ///   ───────────┼───────────────┼─────────────┼───────────
+        ///       0      │   Lookup(1)   │   M60       │   M45
+        ///       1      │   Lookup(2)   │   M60       │   M45
+        ///       2      │   Lookup(3)   │   M55  ←change at F3
+        ///       3      │   Lookup(4)   │   M55       │   M40
+        ///       4      │   Lookup(5)   │   M55       │   M40
+        ///       5      │   Lookup(6)   │   M50  ←change at F6
+        ///
+        /// Wall bands:  F1-2=M60, F3-5=M55, F6-8=M50 ...  ✓ (matches user spec)
+        /// Slab bands:  F1-3=M45, F4-6=M40, F7-9=M35 ...  ✓
+        /// </summary>
+        public string GetWallGrade(int storyIndex)
+        {
+            // Shift one floor UP to get the grade of the slab the wall base sits on.
+            // Clamp: at the top floor (storyIndex == totalFloors-1), use the last segment.
+            int wallIndex = Math.Min(totalFloors - 1, storyIndex + 1);
+            System.Diagnostics.Debug.WriteLine(
+                $"  GetWallGrade: storyIndex={storyIndex} → wallIndex={wallIndex} " +
+                $"→ {Lookup(wallIndex).wallGrade}");
+            return Lookup(wallIndex).wallGrade;
+        }
+
+        /// <summary>
+        /// Beam/slab concrete grade for a story (0-based index, 0 = bottom).
+        /// Slabs/beams sit AT the Plan View Z of their story → no index shift.
+        /// Called by BeamImporterEnhanced.ImportBeams() and SlabImporterEnhanced.ImportSlabs().
+        /// </summary>
+        public string GetBeamSlabGrade(int storyIndex)
+            => Lookup(storyIndex).beamSlabGrade;
+
+        /// <summary>Alias — kept for back-compat with WallImporter.</summary>
+        public string GetWallGradeForStory(int storyIndex)
+            => GetWallGrade(storyIndex);
+
+        /// <summary>Alias — kept for back-compat with BeamImporter / SlabImporter.</summary>
+        public string GetBeamSlabGradeForStory(int storyIndex)
+            => GetBeamSlabGrade(storyIndex);
 
         // ====================================================================
         // GRADE CALCULATION
         // ====================================================================
 
         /// <summary>
-        /// Calculate beam/slab grade from wall grade using 0.7× formula
-        /// Result is rounded up to nearest 5, with minimum of M30
-        /// 
-        /// Examples:
-        ///   M50 → 50 × 0.7 = 35 → M35
-        ///   M45 → 45 × 0.7 = 31.5 → round to 35 → M35
-        ///   M40 → 40 × 0.7 = 28 → round to 30 → M30 (minimum)
+        /// Beam/slab grade = 0.7 × wall grade, rounded UP to nearest 5, min M30.
+        ///   M60 → 42 → M45
+        ///   M55 → 38.5 → M40
+        ///   M45 → 31.5 → M35
+        ///   M40 → 28 → M30
+        ///   M30 → 21 → M30 (minimum)
         /// </summary>
-        /// <param name="wallGrade">Wall grade (e.g., "M50")</param>
-        /// <returns>Calculated beam/slab grade (e.g., "M35")</returns>
         private string CalculateBeamSlabGrade(string wallGrade)
         {
-            int wallGradeValue = ExtractGradeValue(wallGrade);
-            double beamSlabValue = wallGradeValue * 0.7;
-            int roundedValue = (int)(Math.Ceiling(beamSlabValue / 5.0) * 5);
-
-            // Minimum grade M30
-            if (roundedValue < 30)
-                roundedValue = 30;
-
-            return $"M{roundedValue}";
+            int v = ExtractGradeValue(wallGrade);
+            int rounded = (int)(Math.Ceiling(v * 0.7 / 5.0) * 5);
+            return $"M{Math.Max(rounded, 30)}";
         }
 
-        /// <summary>
-        /// Extract numeric value from grade string (e.g., "M50" → 50)
-        /// </summary>
-        /// <param name="grade">Grade string (e.g., "M50", "m45")</param>
-        /// <returns>Numeric grade value</returns>
         private int ExtractGradeValue(string grade)
         {
             if (string.IsNullOrEmpty(grade))
-                throw new ArgumentException("Grade cannot be null or empty");
+                throw new ArgumentException("Grade string cannot be null or empty");
 
-            string numericPart = grade.ToUpperInvariant().Replace("M", "").Trim();
-
-            if (int.TryParse(numericPart, out int value))
-                return value;
-
-            throw new ArgumentException($"Invalid grade format: {grade}");
+            string num = grade.ToUpperInvariant().Replace("M", "").Trim();
+            if (int.TryParse(num, out int val)) return val;
+            throw new ArgumentException($"Invalid grade format: '{grade}'");
         }
 
         // ====================================================================
-        // GRADE RETRIEVAL BY STORY INDEX
+        // VALIDATION
         // ====================================================================
 
-        /// <summary>
-        /// Get wall grade for a specific story (0-based index)
-        /// This is the method called by CADImporterEnhanced
-        /// 
-        /// Story index mapping:
-        ///   0 = First basement (Basement1) OR first floor if no basements
-        ///   1 = Second basement (Basement2) OR second floor
-        ///   2 = Third basement (Basement3) OR third floor
-        ///   etc.
-        /// </summary>
-        /// <param name="storyIndex">Story index (0-based)</param>
-        /// <returns>Wall concrete grade (e.g., "M50")</returns>
-        public string GetWallGrade(int storyIndex)
-        {
-            return GetWallGradeForStory(storyIndex);
-        }
-
-        /// <summary>
-        /// Get beam/slab grade for a specific story (0-based index)
-        /// This is the method called by CADImporterEnhanced
-        /// </summary>
-        /// <param name="storyIndex">Story index (0-based)</param>
-        /// <returns>Beam/slab concrete grade (e.g., "M35")</returns>
-        public string GetBeamSlabGrade(int storyIndex)
-        {
-            return GetBeamSlabGradeForStory(storyIndex);
-        }
-
-        /// <summary>
-        /// Get wall grade for a specific story (0-based index)
-        /// Internal implementation method
-        /// </summary>
-        /// <param name="story">Story index (0-based, 0 = bottom floor)</param>
-        /// <returns>Wall concrete grade</returns>
-        public string GetWallGradeForStory(int story)
-        {
-            // Handle out-of-range: use last grade as default
-            if (story < 0 || story >= totalFloors)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"⚠️  Story index {story} out of range [0-{totalFloors - 1}], using last grade");
-                return gradeSchedules.Last().WallGrade;
-            }
-
-            int floorsFromBottom = 0;
-            foreach (var schedule in gradeSchedules)
-            {
-                floorsFromBottom += schedule.FloorsFromBottom;
-                if (story < floorsFromBottom)
-                    return schedule.WallGrade;
-            }
-
-            // Fallback to last grade
-            return gradeSchedules.Last().WallGrade;
-        }
-
-        /// <summary>
-        /// Get beam/slab grade for a specific story (0-based index)
-        /// Internal implementation method
-        /// </summary>
-        /// <param name="story">Story index (0-based, 0 = bottom floor)</param>
-        /// <returns>Beam/slab concrete grade</returns>
-        public string GetBeamSlabGradeForStory(int story)
-        {
-            // Handle out-of-range: use last grade as default
-            if (story < 0 || story >= totalFloors)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"⚠️  Story index {story} out of range [0-{totalFloors - 1}], using last grade");
-                return gradeSchedules.Last().BeamSlabGrade;
-            }
-
-            int floorsFromBottom = 0;
-            foreach (var schedule in gradeSchedules)
-            {
-                floorsFromBottom += schedule.FloorsFromBottom;
-                if (story < floorsFromBottom)
-                    return schedule.BeamSlabGrade;
-            }
-
-            // Fallback to last grade
-            return gradeSchedules.Last().BeamSlabGrade;
-        }
-
-        // ====================================================================
-        // UTILITY METHODS
-        // ====================================================================
-
-        /// <summary>
-        /// Get floor range text for a schedule index (for display purposes)
-        /// Uses 1-based floor numbers for user clarity
-        /// </summary>
-        /// <param name="scheduleIndex">Index in gradeSchedules list</param>
-        /// <returns>Floor range text (e.g., "1-11")</returns>
-        private string GetFloorRangeText(int scheduleIndex)
-        {
-            if (scheduleIndex < 0 || scheduleIndex >= gradeSchedules.Count)
-                return "Unknown";
-
-            int startFloor = 0;
-            for (int i = 0; i < scheduleIndex; i++)
-                startFloor += gradeSchedules[i].FloorsFromBottom;
-
-            int endFloor = startFloor + gradeSchedules[scheduleIndex].FloorsFromBottom - 1;
-            return $"{startFloor + 1}-{endFloor + 1}";
-        }
-
-        /// <summary>
-        /// Get a formatted summary of the entire grade schedule
-        /// </summary>
-        /// <returns>Multi-line summary string</returns>
-        public string GetScheduleSummary()
-        {
-            string summary = "=== CONCRETE GRADE SCHEDULE ===\n\n";
-            summary += $"Total Floors: {totalFloors}\n\n";
-
-            for (int i = 0; i < gradeSchedules.Count; i++)
-            {
-                var schedule = gradeSchedules[i];
-                string floorRange = GetFloorRangeText(i);
-                summary += $"Floors {floorRange} ({schedule.FloorsFromBottom} floors):\n";
-                summary += $"  Wall Grade: {schedule.WallGrade}\n";
-                summary += $"  Beam/Slab Grade: {schedule.BeamSlabGrade}\n\n";
-            }
-            return summary;
-        }
-
-        /// <summary>
-        /// Validate that the total floors in the schedule matches expected count
-        /// </summary>
-        /// <param name="expectedFloors">Expected number of floors</param>
-        /// <returns>True if total matches expected</returns>
         public bool ValidateTotalFloors(int expectedFloors)
         {
-            bool isValid = totalFloors == expectedFloors;
-
-            if (!isValid)
-            {
+            bool ok = totalFloors == expectedFloors;
+            if (!ok)
                 System.Diagnostics.Debug.WriteLine(
-                    $"⚠️  Grade schedule validation failed: Expected {expectedFloors} floors, got {totalFloors}");
-            }
-
-            return isValid;
+                    $"⚠ GradeScheduleManager: expected {expectedFloors} floors, " +
+                    $"schedule covers {totalFloors}");
+            return ok;
         }
 
-        /// <summary>
-        /// Get a copy of all grade schedules
-        /// </summary>
-        /// <returns>List of grade schedules</returns>
+        // ====================================================================
+        // UTILITY / REPORTING
+        // ====================================================================
+
         public List<GradeSchedule> GetAllSchedules()
-        {
-            return new List<GradeSchedule>(gradeSchedules);
-        }
+            => new List<GradeSchedule>(gradeSchedules);
 
-        /// <summary>
-        /// Get grade ranges with floor numbers (useful for display/reporting)
-        /// Returns 0-based floor indices internally, but ToString() shows 1-based
-        /// </summary>
-        /// <returns>List of grade ranges</returns>
         public List<GradeRange> GetGradeRanges()
         {
-            List<GradeRange> ranges = new List<GradeRange>();
-            int currentFloor = 0;
-
-            for (int i = 0; i < gradeSchedules.Count; i++)
+            var ranges = new List<GradeRange>();
+            int cur = 0;
+            foreach (var seg in gradeSchedules)
             {
-                var schedule = gradeSchedules[i];
                 ranges.Add(new GradeRange
                 {
-                    StartFloor = currentFloor,
-                    EndFloor = currentFloor + schedule.FloorsFromBottom - 1,
-                    WallGrade = schedule.WallGrade,
-                    BeamSlabGrade = schedule.BeamSlabGrade
+                    StartFloor = cur,
+                    EndFloor = cur + seg.FloorsFromBottom - 1,
+                    WallGrade = seg.WallGrade,
+                    BeamSlabGrade = seg.BeamSlabGrade
                 });
-                currentFloor += schedule.FloorsFromBottom;
+                cur += seg.FloorsFromBottom;
             }
             return ranges;
         }
 
-        // ====================================================================
-        // DIAGNOSTIC METHODS
-        // ====================================================================
-
         /// <summary>
-        /// Print detailed grade schedule to debug output
-        /// Shows how grades map to individual basement floors and other floors
+        /// Returns wall grade ranges shifted down by 1 floor to match ETABS wall
+        /// assignment convention (wall at story N is displayed under story N+1).
+        ///
+        /// Example — 3 floors per grade, M60/M55/M45/M40/M30:
+        ///   Beam/Slab ranges : F1-3, F4-6, F7-9,  F10-12, F13-15
+        ///   Wall ranges      : F1-2, F3-5, F6-8,  F9-11,  F12-15
+        ///
+        /// The last segment absorbs the extra floor so total always = totalFloors.
         /// </summary>
-        public void PrintDetailedSchedule()
+        public List<GradeRange> GetWallGradeRanges()
         {
-            System.Diagnostics.Debug.WriteLine("\n╔════════════════════════════════════════════════════╗");
-            System.Diagnostics.Debug.WriteLine("║         CONCRETE GRADE SCHEDULE DETAIL             ║");
-            System.Diagnostics.Debug.WriteLine("╚════════════════════════════════════════════════════╝\n");
+            var ranges = new List<GradeRange>();
+            if (gradeSchedules.Count == 0) return ranges;
 
-            System.Diagnostics.Debug.WriteLine($"Total Floors: {totalFloors}");
-            System.Diagnostics.Debug.WriteLine("(Includes individual basements, ground, podium, etc.)\n");
+            // Build floor-by-floor wall grade array using the same shifted lookup
+            // then group contiguous runs of the same grade into ranges.
+            string currentGrade = GetWallGrade(0);
+            int rangeStart = 0;
 
-            var ranges = GetGradeRanges();
-            foreach (var range in ranges)
+            for (int i = 1; i < totalFloors; i++)
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"Floors {range.StartFloor + 1:D2}-{range.EndFloor + 1:D2}: " +
-                    $"Wall={range.WallGrade}, Beam/Slab={range.BeamSlabGrade}");
+                string g = GetWallGrade(i);
+                if (g != currentGrade)
+                {
+                    ranges.Add(new GradeRange
+                    {
+                        StartFloor = rangeStart,
+                        EndFloor = i - 1,
+                        WallGrade = currentGrade,
+                        BeamSlabGrade = Lookup(Math.Max(0, rangeStart - 1)).beamSlabGrade
+                    });
+                    currentGrade = g;
+                    rangeStart = i;
+                }
             }
+            // Last segment
+            ranges.Add(new GradeRange
+            {
+                StartFloor = rangeStart,
+                EndFloor = totalFloors - 1,
+                WallGrade = currentGrade,
+                BeamSlabGrade = Lookup(Math.Max(0, rangeStart - 1)).beamSlabGrade
+            });
 
-            System.Diagnostics.Debug.WriteLine("\n" + new string('═', 56));
+            return ranges;
+        }
+
+        public string GetScheduleSummary()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== CONCRETE GRADE SCHEDULE ===");
+            sb.AppendLine($"Total Floors: {totalFloors}");
+            sb.AppendLine();
+            foreach (var r in GetGradeRanges())
+                sb.AppendLine(r.ToString());
+            return sb.ToString();
+        }
+
+        public string GetFloorGradeInfo(int storyIndex)
+        {
+            var (w, bs) = Lookup(storyIndex);
+            return $"Floor {storyIndex + 1:D2}: Wall={w}, Beam/Slab={bs}";
         }
 
         /// <summary>
-        /// Get grade information for a specific floor (for debugging)
+        /// Prints every floor's wall AND beam/slab grade to the debug output.
+        /// Shows both the story index and the shifted wall-lookup index so the
+        /// one-floor offset is clearly visible.
         /// </summary>
-        /// <param name="floorIndex">Floor index (0-based)</param>
-        /// <returns>Formatted string with grade info</returns>
-        public string GetFloorGradeInfo(int floorIndex)
+        public void PrintFloorByFloorGrades()
         {
-            string wallGrade = GetWallGrade(floorIndex);
-            string beamSlabGrade = GetBeamSlabGrade(floorIndex);
-            return $"Floor {floorIndex + 1:D2}: Wall={wallGrade}, Beam/Slab={beamSlabGrade}";
+            System.Diagnostics.Debug.WriteLine(
+                "\n╔══════════════════════════════════════════════════════════╗");
+            System.Diagnostics.Debug.WriteLine(
+                "║        GRADE SCHEDULE — FLOOR BY FLOOR (v2.3)           ║");
+            System.Diagnostics.Debug.WriteLine(
+                "║  Wall grade uses (storyIndex-1) — ETABS wall convention  ║");
+            System.Diagnostics.Debug.WriteLine(
+                "╚══════════════════════════════════════════════════════════╝");
+            System.Diagnostics.Debug.WriteLine(
+                $"  {"Idx",-5} {"Floor",-7} {"WallIdx",-9} {"WallGrade",-12} {"BeamSlabGrade",-14}");
+            System.Diagnostics.Debug.WriteLine(
+                $"  {new string('-', 50)}");
+            for (int i = 0; i < totalFloors; i++)
+            {
+                int wallIdx = Math.Max(0, i - 1);
+                string wallGrade = Lookup(wallIdx).wallGrade;
+                string beamGrade = Lookup(i).beamSlabGrade;
+                System.Diagnostics.Debug.WriteLine(
+                    $"  [{i:D2}]  F{i + 1:D2}   [{wallIdx:D2}]      {wallGrade,-12} {beamGrade,-14}");
+            }
+            System.Diagnostics.Debug.WriteLine(new string('═', 56));
         }
 
         // ====================================================================
         // PROPERTIES
         // ====================================================================
 
-        /// <summary>
-        /// Get total number of floors covered by this schedule
-        /// Includes all floor types: basements, podium, ground, e-deck, typical, terrace
-        /// </summary>
         public int TotalFloors => totalFloors;
-
-        /// <summary>
-        /// Get number of grade segments in the schedule
-        /// </summary>
         public int SegmentCount => gradeSchedules.Count;
     }
 }

@@ -117,11 +117,10 @@ namespace ETAB_Automation
                     double foundationHeight = importForm.FoundationHeight;
 
                     // When basement is present but foundation is unchecked (foundationHeight=0),
-                    // force a minimum of 0.01m so the height shift can be applied.
-                    // This gives Basement1 Plan View Z ≈ 0 instead of 3.5m.
+                    // do NOT force a fake 0.01m value — that causes degenerate 1cm foundation walls.
+                    // Leave foundationHeight=0 so StoryManager and CADImporter skip the foundation-split
+                    // path entirely and treat all floors as normal stories stacked from zero.
                     bool hasBasement = floorConfigs.Any(c => c.IsIndividualBasement);
-                    if (hasBasement && foundationHeight <= 0)
-                        foundationHeight = 0.01;
 
                     // ── Build story lists ────────────────────────────────────
                     var storyHeights = new List<double>();

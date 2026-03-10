@@ -1,5 +1,6 @@
 ﻿
 
+
 // ============================================================================
 // FILE: Importers/BeamImporterEnhanced.cs
 // ============================================================================
@@ -229,9 +230,9 @@ namespace ETABS_CAD_Automation.Importers
                     $"{mainBeamSections.Count} main (MB__)");
 
                 if (gravityBeamSections.Count == 0 && mainBeamSections.Count == 0)
-                    throw new InvalidOperationException(
-                        "No beam sections found in ETABS template.\n" +
-                        "Expected format: B20X75M35 (gravity) / MB25X75M35 (main).");
+                    System.Diagnostics.Debug.WriteLine(
+                        "⚠ No beam sections found in ETABS template — " +
+                        "sections will be auto-defined as needed (B__/MB__ format).");
             }
             catch (Exception ex)
             {
@@ -265,12 +266,25 @@ namespace ETABS_CAD_Automation.Importers
         // CLOSEST-SECTION FINDERS
         // ====================================================================
 
+        // ====================================================================
+        // SECTION RESOLUTION — define-if-missing via SectionDefiner
+        // ====================================================================
+
+        /// <summary>
+        /// Returns a gravity beam section name B{wCm}X{dCm}M{grade}.
+        /// If the section does not exist in the template it is auto-defined.
+        /// Falls back to closest existing section if auto-define fails.
+        /// </summary>
         private string BestGravitySection(int reqWidth, int reqDepth, string grade)
         {
+            // 1. Try to define / verify the exact section we need
+            string exact = SectionDefiner.EnsureGravityBeamSection(sapModel, reqWidth, reqDepth, grade);
+            if (!string.IsNullOrEmpty(exact))
+                return exact;
+
+            // 2. Fallback: closest existing section (old behaviour)
             string gn = NormalizeGrade(grade);
             string best = null; int minDiff = int.MaxValue;
-
-            // Try grade-specific first
             if (!string.IsNullOrEmpty(gn))
             {
                 foreach (var kvp in gravityBeamSections)
@@ -282,8 +296,6 @@ namespace ETABS_CAD_Automation.Importers
                 }
                 if (best != null) return best;
             }
-
-            // Grade-agnostic fallback
             minDiff = int.MaxValue;
             foreach (var kvp in gravityBeamSections)
             {
@@ -291,16 +303,24 @@ namespace ETABS_CAD_Automation.Importers
                       + Math.Abs(kvp.Value.WidthMm - reqWidth);
                 if (d < minDiff) { minDiff = d; best = kvp.Key; }
             }
-
-            return best ?? throw new InvalidOperationException(
-                $"No gravity beam section (B__) found for {reqWidth}×{reqDepth}mm.");
+            return best ?? SectionDefiner.EnsureGravityBeamSection(sapModel, reqWidth, reqDepth, "M30");
         }
 
+        /// <summary>
+        /// Returns a main beam section name MB{wCm}X{dCm}M{grade}.
+        /// If the section does not exist in the template it is auto-defined.
+        /// Falls back to closest existing section if auto-define fails.
+        /// </summary>
         private string BestMainSection(int reqWidth, int reqDepth, string grade)
         {
+            // 1. Try to define / verify the exact section we need
+            string exact = SectionDefiner.EnsureMainBeamSection(sapModel, reqWidth, reqDepth, grade);
+            if (!string.IsNullOrEmpty(exact))
+                return exact;
+
+            // 2. Fallback: closest existing section
             string gn = NormalizeGrade(grade);
             string best = null; int minDiff = int.MaxValue;
-
             if (!string.IsNullOrEmpty(gn))
             {
                 foreach (var kvp in mainBeamSections)
@@ -312,7 +332,6 @@ namespace ETABS_CAD_Automation.Importers
                 }
                 if (best != null) return best;
             }
-
             minDiff = int.MaxValue;
             foreach (var kvp in mainBeamSections)
             {
@@ -320,16 +339,13 @@ namespace ETABS_CAD_Automation.Importers
                       + Math.Abs(kvp.Value.WidthMm - reqWidth);
                 if (d < minDiff) { minDiff = d; best = kvp.Key; }
             }
-
             if (best == null && gravityBeamSections.Count > 0)
             {
                 System.Diagnostics.Debug.WriteLine(
                     "⚠ No MB__ sections — falling back to gravity (B__) for main beam");
                 return BestGravitySection(reqWidth, reqDepth, grade);
             }
-
-            return best ?? throw new InvalidOperationException(
-                $"No main beam section (MB__) found for {reqWidth}×{reqDepth}mm.");
+            return best ?? SectionDefiner.EnsureMainBeamSection(sapModel, reqWidth, reqDepth, "M30");
         }
 
         private static string NormalizeGrade(string grade)
@@ -565,12 +581,12 @@ namespace ETABS_CAD_Automation.Importers
                     int ret = sapModel.FrameObj.SetLoadDistributed(
                         name,
                         patternName,  // exact ETABS Load Pattern
-                        1,            // MyType  : 1 = Force
-                        4,            // Dir     : 6 = Gravity (global -Z, downward)
-                        0.0,          // Dist1   : relative start  (0.0 = End-I)
-                        1.0,          // Dist2   : relative end    (1.0 = End-J)
-                        6000.0,          // Val1    : 6 kN/m at start (downward — gravity dir = positive)
-                        6000.0,          // Val2    : 6 kN/m at end
+                        1,            // MyType : 1 = Force per unit length
+                        10,           // Dir    : 10 = Gravity (downward) for ETABS 2026
+                        0.0,          // Dist1  : relative start (0.0 = End-I)
+                        1.0,          // Dist2  : relative end   (1.0 = End-J)
+                        6000.0,       // Val1   : 6 kN/m at start
+                        6000.0,       // Val2   : 6 kN/m at end
                         "Global",
                         true,         // RelDist : true = relative distances
                         true);        // Replace : true = replace existing load

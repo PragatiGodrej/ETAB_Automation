@@ -1,10 +1,4 @@
 ﻿
-// ============================================================================
-// FILE: UI/ImportConfigForm.UI.cs (PART 2 - UI Initialization)
-// ============================================================================
-// PURPOSE: UI initialization and tab creation for ImportConfigForm
-// VERSION: 2.9 — IS 1893 Code Edition selector (2016 / 2025) + live GPL refresh
-// ============================================================================
 
 using ETAB_Automation.Core;
 using ETAB_Automation.Models;
@@ -42,7 +36,7 @@ namespace ETAB_Automation
 
             this.Size = new System.Drawing.Size(980, 840);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Text = "ETABS CAD Import Configuration v2.9";
+            this.Text = "ETABS CAD Import Configuration v3.0";
 
             tabControl = new TabControl
             {
@@ -161,7 +155,7 @@ namespace ETAB_Automation
             chkTerrace.CheckedChanged += ChkTerrace_CheckedChanged;
             y += 62;
 
-            // ── 2a. Updated Seismic Parameters group (height 70 → 110) ───
+            // ── Seismic Parameters group ─────────────────────────────────
             var grpS = AddGroupBox(tab, "Seismic Parameters", 20, y, 910, 110);
 
             // ROW 1 — IS Code edition
@@ -181,7 +175,6 @@ namespace ETAB_Automation
             cmbISCode.SelectedIndex = 1;   // default = IS 2025
             grpS.Controls.Add(cmbISCode);
 
-            // Colour-coded note so users notice the switch
             var lblCodeNote = new Label
             {
                 Text = "2025 = latest standard (TDD/MSO). Switch to 2016 for legacy projects.",
@@ -192,33 +185,31 @@ namespace ETAB_Automation
             };
             grpS.Controls.Add(lblCodeNote);
 
-            // Wire event: regenerate GPL hint values on all existing floor tabs
-            cmbISCode.SelectedIndexChanged += (s, ev) => RefreshWallThicknessDefaults();
+            // Wire up both code and zone dropdowns to refresh GPL values
+            cmbISCode.SelectedIndexChanged += (s, ev) =>
+            {
+                UpdateSeismicZoneDropdown();
+                RefreshWallThicknessDefaults();
+            };
 
-            // ROW 2 — Seismic Zone (moved down by 35 px)
+            // ROW 2 — Seismic Zone
             AddLabel(grpS, "Seismic Zone:", 35, 62, 115, 20);
             cmbSeismicZone = new ComboBox
             {
                 Location = new System.Drawing.Point(155, 59),
-                Size = new System.Drawing.Size(260, 25),
+                Size = new System.Drawing.Size(310, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbSeismicZone.Items.AddRange(new object[]
-            {
-                "Zone II (Bangalore, Hyderabad)",
-                "Zone III",
-                "Zone IV (Ahmedabad & Kolkata)",
-                "Zone IV (NCR)",
-                "Zone V"
-            });
-            cmbSeismicZone.SelectedIndex = 2;
+            // Initially populate for IS 2025 (default)
+            PopulateSeismicZones2025();
+            cmbSeismicZone.SelectedIndex = 0;
             cmbSeismicZone.SelectedIndexChanged += (s, ev) => RefreshWallThicknessDefaults();
             grpS.Controls.Add(cmbSeismicZone);
 
-            AddLabel(grpS, "Zone II/III → gravity beam 200 mm  |  Zone IV/V → 240 mm",
-                425, 62, 470, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
+            AddLabel(grpS, "Zone II/III → gravity beam 200 mm  |  Zone IV/V/VI → 240 mm",
+                475, 62, 420, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
-            y += 120;   // was 80 → 120
+            y += 120;
 
             var btnGen = new Button
             {
@@ -230,6 +221,61 @@ namespace ETAB_Automation
             };
             btnGen.Click += BtnGenerateTabs_Click;
             tab.Controls.Add(btnGen);
+        }
+
+        // ====================================================================
+        // SEISMIC ZONE DROPDOWN — populated per IS code edition
+        // ====================================================================
+
+        /// <summary>
+        /// Called when cmbISCode changes — repopulates the zone dropdown with
+        /// the correct zone strings for the selected IS code edition.
+        /// These strings MUST match the case strings in WallThicknessCalculator.
+        /// </summary>
+        private void UpdateSeismicZoneDropdown()
+        {
+            if (cmbISCode == null || cmbSeismicZone == null) return;
+
+            string currentZone = cmbSeismicZone.SelectedItem?.ToString() ?? "";
+            cmbSeismicZone.Items.Clear();
+
+            if (cmbISCode.SelectedIndex == 0)
+                PopulateSeismicZones2016();
+            else
+                PopulateSeismicZones2025();
+
+            // Try to keep the same zone selected after switch
+            int idx = cmbSeismicZone.FindStringExact(currentZone);
+            cmbSeismicZone.SelectedIndex = (idx >= 0) ? idx : 0;
+        }
+
+        private void PopulateSeismicZones2025()
+        {
+            // Zone strings MUST exactly match WallThicknessCalculator GetThickness2025 switch
+            cmbSeismicZone.Items.AddRange(new object[]
+            {
+                "Zone II (Bangalore, Hyderabad)",
+                "Zone III (MMR & Pune)",
+                "Zone IV (Ahmedabad & Kolkata)",
+                "Zone IV (NCR)",
+                "Zone V"
+            });
+        }
+
+        private void PopulateSeismicZones2016()
+        {
+            // Zone strings MUST exactly match WallThicknessCalculator GetThickness2016 switch
+            cmbSeismicZone.Items.AddRange(new object[]
+            {
+                "Zone II (Bangalore, Hyderabad)",
+                "Zone III (MMR, Ahmedabad, Kolkata, Pune)",
+                "Zone IV (NCR)",
+                "Zone V"
+            });
+            // Note: "Zone IV (Ahmedabad & Kolkata)" is intentionally excluded for IS 2016
+            // because IS 2016 lists those cities under Zone III. The calculator handles
+            // this string gracefully by routing to GetZone3_2016 if it arrives, but the
+            // UI should not offer it as a separate selection for IS 2016.
         }
 
         // ====================================================================
@@ -373,13 +419,12 @@ namespace ETAB_Automation
 
             int numFloors = chkTypical.Checked ? (int)numTypicalLevels.Value : 20;
             string seisZone = cmbSeismicZone.SelectedItem?.ToString()
-                              ?? "Zone IV (Ahmedabad & Kolkata)";
+                              ?? "Zone II (Bangalore, Hyderabad)";
 
             AddLayerMappingUI(tab, floorType, ref y);
             AddWallThicknessUI(tab, floorType, numFloors, seisZone, ref y);
             AddBeamDepthsUI(tab, floorType, namedGravityBeams, numFloors, seisZone, ref y);
             AddSlabThicknessesUI(tab, floorType, ref y);
-            //AddColumnSizeUI(tab, floorType, ref y);
         }
 
         // ====================================================================
@@ -433,7 +478,6 @@ namespace ETAB_Automation
         private void AddWallThicknessUI(TabPage tab, string floorType,
             int numFloors, string seisZone, ref int y)
         {
-            // ── 2d. Resolve IS code and pass to SafeGetGPL ───────────────
             var isCode = (cmbISCode?.SelectedIndex == 0)
                 ? WallThicknessCalculator.ISCodeVersion.IS2016
                 : WallThicknessCalculator.ISCodeVersion.IS2025;
@@ -441,10 +485,10 @@ namespace ETAB_Automation
             string codeTag = isCode == WallThicknessCalculator.ISCodeVersion.IS2016
                 ? "IS 1893:2016" : "IS 1893:2025";
 
-            int gplCore = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.CoreWall, seisZone, isCode);
-            int gplPerDead = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralDeadWall, seisZone, isCode);
-            int gplPerPortal = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralPortalWall, seisZone, isCode);
-            int gplInternal = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.InternalWall, seisZone, isCode);
+            int gplCore = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.CoreWall, seisZone, isCode);
+            int gplPerDead = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.PeripheralDeadWall, seisZone, isCode);
+            int gplPerPortal = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.PeripheralPortalWall, seisZone, isCode);
+            int gplInternal = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.InternalWall, seisZone, isCode);
 
             const int grpH = 195;
             var grp = AddGroupBox(tab,
@@ -473,7 +517,7 @@ namespace ETAB_Automation
             numPeriphPortalWallOverridePerFloor[floorType] =
                 AddNumericCtrl(grp, C3N, ry1 - 2, 100, 700, gplPerPortal, increment: 25);
             toolTip.SetToolTip(numPeriphPortalWallOverridePerFloor[floorType],
-                $"GPL table value for {numFloors} floors: {gplPerPortal} mm");
+                $"GPL table value for {numFloors} floors, {seisZone}: {gplPerPortal} mm");
 
             const int ry2 = 80;
             AddLabel(grp, "Internal Wall (mm):", C1L, ry2, C1N - C1L - 5, 20);
@@ -481,9 +525,7 @@ namespace ETAB_Automation
                 AddNumericCtrl(grp, C1N, ry2 - 2, 100, 700, gplInternal, increment: 25);
             AddLabel(grp, $"GPL: {gplInternal}", C1N + NW + 4, ry2 + 2, 62, 16,
                 italic: true, color: System.Drawing.Color.DimGray, fontSize: 7.5f);
-            AddLabel(grp,
-                "(short wall < 1.8 m may require thicker — see GPL table for coupled shear wall cases)",
-                C2L, ry2 + 2, 480, 16,
+            AddLabel(grp, "", C2L, ry2 + 2, 480, 16,
                 italic: true, color: System.Drawing.Color.Gray, fontSize: 7.5f);
 
             const int ry3 = 110;
@@ -510,29 +552,31 @@ namespace ETAB_Automation
             y += grpH + 8;
         }
 
-        // ── 2c. Updated SafeGetGPL — accepts optional ISCodeVersion ──────
+        // ── SafeGetGPL ───────────────────────────────────────────────────
         private static int SafeGetGPL(int floors,
-            Core.WallThicknessCalculator.WallType wallType, string seisZone,
+            WallThicknessCalculator.WallType wallType, string seisZone,
             WallThicknessCalculator.ISCodeVersion isCode = WallThicknessCalculator.ISCodeVersion.IS2025)
         {
             try
             {
                 int f = Math.Max(1, Math.Min(50, floors));
-                return Core.WallThicknessCalculator.GetRecommendedThickness(
+                return WallThicknessCalculator.GetRecommendedThickness(
                     f, wallType, seisZone, 2.0, false,
                     WallThicknessCalculator.ConstructionType.TypeII, isCode);
             }
             catch
             {
-                return wallType == Core.WallThicknessCalculator.WallType.CoreWall ? 300 : 200;
+                // Fallback — should not normally occur if zone names are kept in sync
+                return wallType == WallThicknessCalculator.WallType.CoreWall ? 300 :
+                       wallType == WallThicknessCalculator.WallType.PeripheralPortalWall ? 300 : 200;
             }
         }
 
-        // ── 2b. RefreshWallThicknessDefaults ─────────────────────────────
+        // ── RefreshWallThicknessDefaults ─────────────────────────────────
         /// <summary>
-        /// Re-reads the selected IS code + zone and updates all pre-filled
-        /// GPL NumericUpDown values on every existing floor tab.
-        /// Called when either cmbISCode or cmbSeismicZone changes.
+        /// Re-reads selected IS code + zone and updates all pre-filled GPL
+        /// NumericUpDown values on every existing floor tab.
+        /// Called when cmbISCode or cmbSeismicZone changes.
         /// </summary>
         private void RefreshWallThicknessDefaults()
         {
@@ -541,43 +585,34 @@ namespace ETAB_Automation
                 : WallThicknessCalculator.ISCodeVersion.IS2025;
 
             string zone = cmbSeismicZone?.SelectedItem?.ToString()
-                ?? "Zone IV (Ahmedabad & Kolkata)";
+                ?? "Zone II (Bangalore, Hyderabad)";
 
             int numFloors = chkTypical.Checked
                 ? (int)numTypicalLevels.Value : 20;
 
-            // Update each per-floor wall override NUD with the new GPL value
             foreach (string ft in numCoreWallOverridePerFloor.Keys)
             {
-                int gplCore = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.CoreWall, zone, isCode);
-                int gplPerDead = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralDeadWall, zone, isCode);
-                int gplPerPort = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralPortalWall, zone, isCode);
-                int gplInt = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.InternalWall, zone, isCode);
+                int gplCore = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.CoreWall, zone, isCode);
+                int gplPerDead = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.PeripheralDeadWall, zone, isCode);
+                int gplPerPort = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.PeripheralPortalWall, zone, isCode);
+                int gplInt = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.InternalWall, zone, isCode);
 
-                if (numCoreWallOverridePerFloor.ContainsKey(ft))
-                    numCoreWallOverridePerFloor[ft].Value =
-                        Math.Max(numCoreWallOverridePerFloor[ft].Minimum,
-                        Math.Min(numCoreWallOverridePerFloor[ft].Maximum, gplCore));
+                void SetNud(Dictionary<string, NumericUpDown> dict, int val)
+                {
+                    if (!dict.ContainsKey(ft)) return;
+                    var nud = dict[ft];
+                    nud.Value = Math.Max(nud.Minimum, Math.Min(nud.Maximum, val));
+                }
 
-                if (numPeriphDeadWallOverridePerFloor.ContainsKey(ft))
-                    numPeriphDeadWallOverridePerFloor[ft].Value =
-                        Math.Max(numPeriphDeadWallOverridePerFloor[ft].Minimum,
-                        Math.Min(numPeriphDeadWallOverridePerFloor[ft].Maximum, gplPerDead));
-
-                if (numPeriphPortalWallOverridePerFloor.ContainsKey(ft))
-                    numPeriphPortalWallOverridePerFloor[ft].Value =
-                        Math.Max(numPeriphPortalWallOverridePerFloor[ft].Minimum,
-                        Math.Min(numPeriphPortalWallOverridePerFloor[ft].Maximum, gplPerPort));
-
-                if (numInternalWallOverridePerFloor.ContainsKey(ft))
-                    numInternalWallOverridePerFloor[ft].Value =
-                        Math.Max(numInternalWallOverridePerFloor[ft].Minimum,
-                        Math.Min(numInternalWallOverridePerFloor[ft].Maximum, gplInt));
+                SetNud(numCoreWallOverridePerFloor, gplCore);
+                SetNud(numPeriphDeadWallOverridePerFloor, gplPerDead);
+                SetNud(numPeriphPortalWallOverridePerFloor, gplPerPort);
+                SetNud(numInternalWallOverridePerFloor, gplInt);
             }
         }
 
         // ====================================================================
-        // BEAM DEPTHS + WIDTH OVERRIDES + BEAM WALL LOAD SETS UI
+        // BEAM DEPTHS + WIDTH OVERRIDES UI
         // ====================================================================
 
         private void AddBeamDepthsUI(TabPage tab, string floorType,
@@ -600,28 +635,25 @@ namespace ETAB_Automation
                 "🔧 Beam Configuration — Depth | Width | Wall Load Set (ETABS pattern name)",
                 20, y, 920, grpHeight);
 
-            // ── 2e. Resolve IS code and pass to SafeGetGPL ───────────────
             var isCode = (cmbISCode?.SelectedIndex == 0)
                 ? WallThicknessCalculator.ISCodeVersion.IS2016
                 : WallThicknessCalculator.ISCodeVersion.IS2025;
 
             int gw = GetAutoGravityWidthFromUI();
 
-            int wCore = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.CoreWall, seisZone, isCode);
-            int wPeriphDead = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralDeadWall, seisZone, isCode);
-            int wPeriphPort = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.PeripheralPortalWall, seisZone, isCode);
-            int wInternal = SafeGetGPL(numFloors, Core.WallThicknessCalculator.WallType.InternalWall, seisZone, isCode);
+            int wCore = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.CoreWall, seisZone, isCode);
+            int wPeriphDead = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.PeripheralDeadWall, seisZone, isCode);
+            int wPeriphPort = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.PeripheralPortalWall, seisZone, isCode);
+            int wInternal = SafeGetGPL(numFloors, WallThicknessCalculator.WallType.InternalWall, seisZone, isCode);
 
             AddLabel(grp,
-                $"Gravity width default: {gw} mm (zone, editable)  |  " +
-                "Main beam width default = GPL wall thickness (editable)  |  ",
-
-
-                15, 20, 890, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 9); 
+                $"Gravity width default: {gw} mm (zone-based, editable)  |  " +
+                "Main beam width default = GPL wall thickness (editable)",
+                15, 20, 890, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 9);
 
             const int beamLabelW = 220;
             int hDepthX = C1L + beamLabelW + 6;
-            int hNudGap = NW + 10;   // match AddBeamRow nudGap
+            int hNudGap = NW + 10;
 
             AddLabel(grp, "Depth (mm)", hDepthX, 40, NW, 18, bold: true, fontSize: 8.5f,
                 color: System.Drawing.Color.DarkSlateGray);
@@ -630,7 +662,6 @@ namespace ETAB_Automation
 
             int gy = 64;
 
-            // ── GRAVITY BEAMS ─────────────────────────────────────────────
             AddLabel(grp, "─── GRAVITY BEAMS ───", C1L, gy, 260, 18, bold: true, fontSize: 9.5f);
             gy += 26;
 
@@ -671,7 +702,7 @@ namespace ETAB_Automation
                         case "Ground":
                             depthDict = numGroundGravityDepthPerFloor;
                             widthDict = numGroundGravityWidthPerFloor; break;
-                        default: // Basement
+                        default:
                             depthDict = numBasementGravityDepthPerFloor;
                             widthDict = numBasementGravityWidthPerFloor; break;
                     }
@@ -685,11 +716,10 @@ namespace ETAB_Automation
             }
 
             AddLabel(grp,
-                "(Named gravity variants use their own depth/width/ per CAD layer.)",
+                "(Named gravity variants use their own depth/width per CAD layer.)",
                 C1L, gy, 880, 16, italic: true, color: System.Drawing.Color.Gray, fontSize: 8.5f);
             gy += 22;
 
-            // ── MAIN BEAMS ────────────────────────────────────────────────
             AddLabel(grp,
                 "─── MAIN BEAMS (MB__ sections) — width defaults from GPL wall thickness; editable ───",
                 C1L, gy, 720, 18, bold: true, fontSize: 9.5f);
@@ -724,8 +754,8 @@ namespace ETAB_Automation
             gy += RH;
 
             AddLabel(grp,
-                "💡 Gravity width = zone (200/240 mm).  Main beam width = GPL wall thickness.  " +
-                "Both are user-editable per floor type. ",
+                "💡 Gravity width = zone-based (200 mm Zone II/III, 240 mm Zone IV/V).  " +
+                "Main beam width = GPL wall thickness.  Both user-editable per floor type.",
                 C1L, gy, 890, 30, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
 
             y += grpHeight + 12;
@@ -747,7 +777,7 @@ namespace ETAB_Automation
             int depthMin = isMain ? 300 : 200;
             const int beamLabelW = 220;
             int depthX = C1L + beamLabelW + 6;
-            int nudGap = NW + 10;   // must match hNudGap in the header above
+            int nudGap = NW + 10;
 
             AddLabel(parent, label, C1L, gy, beamLabelW, 20, fontSize: 9f);
             var numDepth = AddNumericCtrl(parent, depthX, gy - 2, depthMin, depthMax, defaultDepth, increment: 25);
@@ -761,15 +791,14 @@ namespace ETAB_Automation
         }
 
         // ====================================================================
-        // SLAB THICKNESSES + SLAB LOAD SETS UI
+        // SLAB THICKNESSES UI
         // ====================================================================
 
         private void AddSlabThicknessesUI(TabPage tab, string floorType, ref int y)
         {
-            // ── Section A: YELLOW layers ──────────────────────────────────
             const int yellowH = 260;
             var grpYellow = AddGroupBox(tab,
-                "🟡 YELLOW Slabs — Fixed User Thickness )",
+                "🟡 YELLOW Slabs — Fixed User Thickness",
                 20, y, 920, yellowH);
 
             AddLabel(grpYellow,
@@ -812,8 +841,6 @@ namespace ETAB_Automation
                 15, sy, 880, 16, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 7.5f);
 
             y += yellowH + 6;
-
-          
         }
 
         // ====================================================================
@@ -830,7 +857,7 @@ namespace ETAB_Automation
                 return;
             }
 
-            while (tabControl.TabPages.Count > 3)   // Building + Grades + Load Sets = 3 fixed tabs
+            while (tabControl.TabPages.Count > 3)
                 tabControl.TabPages.RemoveAt(3);
 
             ClearAllFloorDicts();
@@ -840,7 +867,8 @@ namespace ETAB_Automation
             if (chkBasement.Checked)
             {
                 int cnt = (int)numBasementLevels.Value;
-                for (int i = 1; i <= cnt; i++)
+                // Inverted: deepest basement = BasementN (bottom), shallowest = Basement1 (near ground)
+                for (int i = cnt; i >= 1; i--)
                 {
                     CreateCADImportTab($"Basement{i}", $"Basement {i} Floor Plan",
                         new List<(string, string)> { ($"B-Basement{i} Gravity", "Basement") });
@@ -889,12 +917,13 @@ namespace ETAB_Automation
                 notes.AppendLine($"• {(int)numPodiumLevels.Value} individual podium tab(s): P1, P2, ...");
 
             string codeLabel = (cmbISCode?.SelectedIndex == 0) ? "IS 1893:2016" : "IS 1893:2025";
+            string zoneLabel = cmbSeismicZone?.SelectedItem?.ToString() ?? "";
 
             MessageBox.Show(
                 $"✓ {tabCount} CAD Import tab(s) generated!\n\n" +
                 notes.ToString() +
-                $"\nWall thicknesses pre-filled from GPL table ({codeLabel}).\n" +
-                "Gravity beam widths pre-filled from zone (200/240 mm) — editable.\n" +
+                $"\nWall thicknesses pre-filled from GPL table ({codeLabel} / {zoneLabel}).\n" +
+                "Gravity beam widths pre-filled from zone (200 mm Zone II/III, 240 mm Zone IV/V) — editable.\n" +
                 "Main beam widths pre-filled from GPL wall thickness — editable.\n\n" +
                 "For each floor tab:\n" +
                 "  1. Browse & load DXF file\n" +
@@ -968,10 +997,18 @@ namespace ETAB_Automation
         // UI HELPER METHODS
         // ====================================================================
 
+        /// <summary>
+        /// Returns default gravity beam width based on seismic zone.
+        /// Zone II / Zone III → 200 mm
+        /// Zone IV / Zone V / Zone VI → 240 mm
+        /// </summary>
         private int GetAutoGravityWidthFromUI()
         {
-            string zone = cmbSeismicZone.SelectedItem?.ToString() ?? "";
-            return (zone.Contains("II") || zone.Contains("III")) ? 200 : 240;
+            string zone = cmbSeismicZone?.SelectedItem?.ToString() ?? "";
+            // Zone II and Zone III → 200 mm; everything else (IV, V, VI) → 240 mm
+            if (zone.StartsWith("Zone II") || zone.StartsWith("Zone III"))
+                return 200;
+            return 240;
         }
 
         private Label AddLabel(Control parent, string text, int x, int y,
@@ -1037,7 +1074,7 @@ namespace ETAB_Automation
         }
 
         // ====================================================================
-        // LOAD SETS TAB — Shared for all floor plans
+        // LOAD SETS TAB
         // ====================================================================
 
         private void InitializeLoadSetsTab(TabPage tab)
@@ -1050,7 +1087,7 @@ namespace ETAB_Automation
                 20, y, 900, 24, bold: true, color: System.Drawing.Color.DarkBlue, fontSize: 11);
             y += 32;
 
-            // ── BEAM WALL LOAD SETS ──────────────────────────────────────────
+            // ── BEAM WALL LOAD SETS ──────────────────────────────────────
             int beamRows = 10;
             var grpBeam = AddGroupBox(tab, "Beam Wall Load Sets", 20, y, 910, 40 + beamRows * 32 + 16);
             AddLabel(grpBeam,
@@ -1090,109 +1127,122 @@ namespace ETAB_Automation
 
             y += 40 + beamRows * 32 + 24;
 
-            // ── SLAB INDIVIDUAL LOADS ────────────────────────────────────────
-            // Each slab layer gets 9 editable numeric fields:
-            // FF | FILL | ASDL | LL | LL>3 | FIRE TDR | TREE | MACH | WATER
+            // ── SLAB INDIVIDUAL LOADS ────────────────────────────────────
             var allSlabs = new (string lbl, string key)[]
             {
-                ("S-AMENITIES",          "Amenities"),
-                ("S-Cantilever BALCONY", "Balcony"),
-                ("S-Cantilever CHAJJA",  "Chajja"),
+                ("S-AMENITIES",            "Amenities"),
+                ("S-Cantilever BALCONY",   "Balcony"),
+                ("S-Cantilever CHAJJA",    "Chajja"),
                 ("S-Cantilever CHAJJA+ODU","ChajjaODU"),
-                ("S-DRIVEWAY",           "Driveway"),
-                ("S-FIRE TENDER",        "FireTender"),
-                ("S-FIRE WATER TANK",    "FireWaterTank"),
-                ("S-GARBAGE ROOM",       "GarbageRoom"),
-                ("S-GARDEN/DINING AREA", "GardenDining"),
-                ("S-GYMNASIUM",          "Gymnasium"),
-                ("S-INDOOR SPORTS",      "IndoorSports"),
-                ("S-KITCHEN SUNK",       "KitchenSink"),
-                ("S-LMR",                "LMR"),
-                ("S-LMR TOP",            "LMRTop"),
-                ("S-LOBBY",              "Lobby"),
-                ("S-METER ROOM",         "MeterRoom"),
-                ("S-MULTIPURPOSE HALL",  "MultipurposeHall"),
-                ("S-OHT",                "OHT"),
-                ("S-OHT TOP",            "OHTTop"),
-                ("S-PARKING",            "Parking"),
-                ("S-PARKING TOILET",     "ParkingToilet"),
-                ("S-PUMP ROOM",          "PumpRoom"),
-                ("S-REFUGE",             "Refuge"),
-                ("S-RESIDENTIAL",        "Residential"),
-                ("S-RETAIL",             "Retail"),
-                ("S-RETAIL MAZZANINE",   "RetailMazzanine"),
-                ("S-RETAIL TOILET",      "RetailToilet"),
-                ("S-SERVICE SLAB",       "ServiceSlab"),
-                ("S-SOCIETY ROOM",       "SocietyRoom"),
-                ("S-STACK PARKING",      "StackParking"),
-                ("S-STAIRCASE",          "Staircase"),
-                ("S-TERRACE",            "Terrace"),
-                ("S-TERRACE FIRE TANK",  "TerraceFire"),
-                ("S-TERRACE PUMP ROOM",  "TerracePumpRoom"),
-                ("S-TOILET",             "Toilet"),
-                ("S-UGT",                "UGT"),
-                ("S-LANDSCAPE",          "Landscape"),
-                ("S-SWIMMING",           "Swimming"),
-                ("S-DG",                 "DG"),
-                ("S-STP",                "STP"),
-                ("S-UTILITY",            "Utility"),
+                ("S-DRIVEWAY",             "Driveway"),
+                ("S-FIRE TENDER",          "FireTender"),
+                ("S-FIRE WATER TANK",      "FireWaterTank"),
+                ("S-GARBAGE ROOM",         "GarbageRoom"),
+                ("S-GARDEN/DINING AREA",   "GardenDining"),
+                ("S-GYMNASIUM",            "Gymnasium"),
+                ("S-INDOOR SPORTS",        "IndoorSports"),
+                ("S-KITCHEN SUNK",         "KitchenSink"),
+                ("S-LMR",                  "LMR"),
+                ("S-LMR TOP",              "LMRTop"),
+                ("S-LOBBY",                "Lobby"),
+                ("S-METER ROOM",           "MeterRoom"),
+                ("S-MULTIPURPOSE HALL",    "MultipurposeHall"),
+                ("S-OHT",                  "OHT"),
+                ("S-OHT TOP",              "OHTTop"),
+                ("S-PARKING",              "Parking"),
+                ("S-PARKING TOILET",       "ParkingToilet"),
+                ("S-PUMP ROOM",            "PumpRoom"),
+                ("S-REFUGE",               "Refuge"),
+                ("S-RESIDENTIAL",          "Residential"),
+                ("S-RETAIL",               "Retail"),
+                ("S-RETAIL MAZZANINE",     "RetailMazzanine"),
+                ("S-RETAIL TOILET",        "RetailToilet"),
+                ("S-SERVICE SLAB",         "ServiceSlab"),
+                ("S-SOCIETY ROOM",         "SocietyRoom"),
+                ("S-STACK PARKING",        "StackParking"),
+                ("S-STAIRCASE",            "Staircase"),
+                ("S-TERRACE",              "Terrace"),
+                ("S-TERRACE FIRE TANK",    "TerraceFire"),
+                ("S-TERRACE PUMP ROOM",    "TerracePumpRoom"),
+                ("S-TOILET",               "Toilet"),
+                ("S-UGT",                  "UGT"),
+                ("S-LANDSCAPE",            "Landscape"),
+                ("S-SWIMMING",             "Swimming"),
+                ("S-DG",                   "DG"),
+                ("S-STP",                  "STP"),
+                ("S-UTILITY",              "Utility"),
             };
 
-            // Column header widths
-            const int lblW = 178;   // slab layer name — slightly wider for bigger font
-            const int nudW = 62;    // numeric field width
-            const int nudGp = 4;     // gap between fields
-            const int rowH = 26;    // row height — increased for bigger font
-            const int hdrY = 20;
-            const int dataY = 46;
+            const int lblW = 178;
+            const int nudW = 72;
+            const int nudGp = 5;
+            const int rowH = 32;
+            const int subtitleY = 20;
+            const int hdrY = 40;
+            const int dataY = 62;
+
             int totalCols = 9;
-            int totalW = lblW + (nudW + nudGp) * totalCols + 20;
-            int totalH = dataY + allSlabs.Length * rowH + 28;
+            int totalW = lblW + (nudW + nudGp) * totalCols + 30;
+            int totalH = dataY + allSlabs.Length * rowH + 36;
 
             var grpSlab = AddGroupBox(tab,
                 "Slab Individual Loads (kN/m²) — edit values, applied per load pattern",
-                20, y, Math.Max(totalW + 20, 910), totalH);
+                20, y, Math.Max(totalW + 20, 960), totalH);
 
             AddLabel(grpSlab,
                 "Values are assigned directly to ETABS load patterns. Zero = pattern skipped.",
-                15, 18, 880, 16, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 9f);
+                15, subtitleY, 880, 16, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 9f);
 
-            // Header row
-            string[] hdrs = { "FLOOR\nFINISH", "FILLING", "ASDL", "LL", "LL>3",
-                               "FIRE\nTNDR", "TREE\nLOAD", "MACH\nRM", "WATER\nTANK" };
+            string[] hdrs = { "FF", "FILLING", "ASDL", "LL", "LL>3", "FIRE", "TREE", "MACH", "WATER" };
+            string[] hdrTooltips = {
+                "Floor Finish (kN/m²)",
+                "Filling (kN/m²)",
+                "ASDL — Additional Superimposed Dead Load (kN/m²)",
+                "Live Load ≤ 3m height (kN/m²)",
+                "Live Load > 3m height (kN/m²)",
+                "Fire Tender Load (kN/m²)",
+                "Tree Load (kN/m²)",
+                "Machine Room Load (kN/m²)",
+                "Water Tank Load (kN/m²)"
+            };
+
             for (int ci = 0; ci < hdrs.Length; ci++)
             {
                 int hx = lblW + 8 + ci * (nudW + nudGp);
-                AddLabel(grpSlab, hdrs[ci], hx, hdrY - 4, nudW, 28,
-                    bold: true, fontSize: 8f, color: System.Drawing.Color.DarkSlateBlue);
+                var hdrLbl = new Label
+                {
+                    Text = hdrs[ci],
+                    Location = new System.Drawing.Point(hx, hdrY),
+                    Size = new System.Drawing.Size(nudW, 18),
+                    Font = new System.Drawing.Font("Segoe UI", 8f, System.Drawing.FontStyle.Bold),
+                    ForeColor = System.Drawing.Color.DarkSlateBlue,
+                    TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+                    AutoSize = false
+                };
+                grpSlab.Controls.Add(hdrLbl);
+                toolTip.SetToolTip(hdrLbl, hdrTooltips[ci]);
             }
 
-            // Colour bands for columns
             var colBg = new System.Drawing.Color[]
             {
-                System.Drawing.Color.FromArgb(255, 245, 200), // FF
-                System.Drawing.Color.FromArgb(255, 235, 180), // Fill
-                System.Drawing.Color.FromArgb(220, 235, 255), // ASDL
-                System.Drawing.Color.FromArgb(200, 255, 200), // LL
-                System.Drawing.Color.FromArgb(180, 245, 180), // LL>3
-                System.Drawing.Color.FromArgb(255, 210, 210), // FireTender
-                System.Drawing.Color.FromArgb(210, 255, 235), // Tree
-                System.Drawing.Color.FromArgb(235, 215, 255), // Machine
-                System.Drawing.Color.FromArgb(195, 235, 255), // WaterTank
+                System.Drawing.Color.FromArgb(255, 245, 200),
+                System.Drawing.Color.FromArgb(255, 235, 180),
+                System.Drawing.Color.FromArgb(220, 235, 255),
+                System.Drawing.Color.FromArgb(200, 255, 200),
+                System.Drawing.Color.FromArgb(180, 245, 180),
+                System.Drawing.Color.FromArgb(255, 210, 210),
+                System.Drawing.Color.FromArgb(210, 255, 235),
+                System.Drawing.Color.FromArgb(235, 215, 255),
+                System.Drawing.Color.FromArgb(195, 235, 255),
             };
 
             for (int ri = 0; ri < allSlabs.Length; ri++)
             {
                 var (sLbl, sKey) = allSlabs[ri];
                 int ry = dataY + ri * rowH;
-                System.Drawing.Color rowBg = (ri % 2 == 0)
-                    ? System.Drawing.Color.White
-                    : System.Drawing.Color.FromArgb(245, 248, 252);
 
-                // Layer label
-                var lblCtrl = AddLabel(grpSlab, sLbl + ":", 8, ry + 3, lblW, 20, fontSize: 9f);
+                AddLabel(grpSlab, sLbl + ":", 8, ry + 4, lblW, 20, fontSize: 9f);
 
-                // Get defaults from FloorTypeConfig
                 FloorTypeConfig.DefaultSlabIndividualLoads.TryGetValue(sKey,
                     out SlabLoads def);
                 def = def ?? new SlabLoads(0, 0, 1, 2);
@@ -1209,8 +1259,8 @@ namespace ETAB_Automation
                     int nx = lblW + 8 + ci * (nudW + nudGp);
                     var nud = new NumericUpDown
                     {
-                        Location = new System.Drawing.Point(nx, ry),
-                        Size = new System.Drawing.Size(nudW, rowH - 2),
+                        Location = new System.Drawing.Point(nx, ry + 2),
+                        Size = new System.Drawing.Size(nudW, rowH - 6),
                         Minimum = 0,
                         Maximum = 200,
                         DecimalPlaces = 2,
