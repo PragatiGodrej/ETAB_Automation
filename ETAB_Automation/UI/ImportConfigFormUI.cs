@@ -1,5 +1,9 @@
 ﻿
 
+
+
+
+
 using ETAB_Automation.Core;
 using ETAB_Automation.Models;
 using System;
@@ -57,6 +61,10 @@ namespace ETAB_Automation
             tabControl.TabPages.Add(tabLoadSets);
             InitializeLoadSetsTab(tabLoadSets);
 
+            var tabSlabRules = new TabPage("Slab Thickness Rules");
+            tabControl.TabPages.Add(tabSlabRules);
+            InitializeSlabThicknessRulesTab(tabSlabRules);
+
             btnImport = new Button
             {
                 Text = "▶  Import to ETABS",
@@ -97,6 +105,7 @@ namespace ETAB_Automation
             chkFoundation.CheckedChanged += ChkFoundation_CheckedChanged;
             AddLabel(grpF, "Foundation Height (m):", 35, 52, 160, 20);
             numFoundationHeight = AddNumericCtrl(grpF, 200, 50, 0.5M, 5.0M, 1.5M, decimals: 2, enabled: false);
+            AddLabel(grpF, "m", 290, 52, 25, 20, color: System.Drawing.Color.DimGray);
             AddLabel(grpF, "(Distance from basement bottom to foundation level)",
                 295, 52, 580, 20, italic: true, color: System.Drawing.Color.Gray);
             y += 95;
@@ -109,6 +118,7 @@ namespace ETAB_Automation
             numBasementLevels.ValueChanged += NumBasementLevels_ValueChanged;
             AddLabel(grpB, "Each Basement Height (m):", 345, 52, 195, 20);
             numBasementHeight = AddNumericCtrl(grpB, 545, 50, 2.5M, 6.0M, 3.5M, decimals: 2, enabled: false);
+            AddLabel(grpB, "m", 635, 52, 25, 20, color: System.Drawing.Color.DimGray);
             AddLabel(grpB, "⚠️ One CAD tab will be created per basement floor (B1, B2, ...)",
                 35, 80, 840, 20, italic: true, color: System.Drawing.Color.DarkRed, fontSize: 8);
             y += 118;
@@ -118,6 +128,7 @@ namespace ETAB_Automation
             chkGround.CheckedChanged += ChkGround_CheckedChanged;
             AddLabel(grpGr, "Ground Floor Height (m):", 35, 52, 180, 20);
             numGroundHeight = AddNumericCtrl(grpGr, 220, 50, 3.0M, 10.0M, 4.0M, decimals: 2, enabled: false);
+            AddLabel(grpGr, "m", 310, 52, 25, 20, color: System.Drawing.Color.DimGray);
             y += 92;
 
             var grpP = AddGroupBox(tab,
@@ -129,6 +140,7 @@ namespace ETAB_Automation
             numPodiumLevels.ValueChanged += NumPodiumLevels_ValueChanged;
             AddLabel(grpP, "Each Podium Height (m):", 345, 52, 185, 20);
             numPodiumHeight = AddNumericCtrl(grpP, 535, 50, 3.0M, 8.0M, 4.5M, decimals: 2, enabled: false);
+            AddLabel(grpP, "m", 625, 52, 25, 20, color: System.Drawing.Color.DimGray);
             AddLabel(grpP, "⚠️ One CAD tab will be created per podium floor (P1, P2, ...)",
                 35, 80, 840, 20, italic: true, color: System.Drawing.Color.DarkRed, fontSize: 8);
             y += 118;
@@ -138,6 +150,7 @@ namespace ETAB_Automation
             chkEDeck.CheckedChanged += ChkEDeck_CheckedChanged;
             AddLabel(grpE, "E-Deck Height (m):", 35, 52, 150, 20);
             numEDeckHeight = AddNumericCtrl(grpE, 190, 50, 3.0M, 10.0M, 4.5M, decimals: 2, enabled: false);
+            AddLabel(grpE, "m", 280, 52, 25, 20, color: System.Drawing.Color.DimGray);
             y += 92;
 
             var grpT = AddGroupBox(tab, "Typical Floors", 20, y, 910, 82);
@@ -148,6 +161,7 @@ namespace ETAB_Automation
             numTypicalLevels.ValueChanged += NumTypicalLevels_ValueChanged;
             AddLabel(grpT, "Typical Floor Height (m):", 335, 52, 190, 20);
             numTypicalHeight = AddNumericCtrl(grpT, 530, 50, 2.8M, 5.0M, 3.0M, decimals: 2, enabled: false);
+            AddLabel(grpT, "m", 620, 52, 25, 20, color: System.Drawing.Color.DimGray);
             y += 92;
 
             var grpTr = AddGroupBox(tab, "Terrace Floor  (always pinned as the topmost floor)", 20, y, 910, 52);
@@ -172,12 +186,12 @@ namespace ETAB_Automation
                 "IS 1893 : 2016  (TDD / PKO)",
                 "IS 1893 : 2025  (TDD / MSO)"
             });
-            cmbISCode.SelectedIndex = 1;   // default = IS 2025
+            cmbISCode.SelectedIndex = 0;   // default = IS 1893:2016
             grpS.Controls.Add(cmbISCode);
 
             var lblCodeNote = new Label
             {
-                Text = "2025 = latest standard (TDD/MSO). Switch to 2016 for legacy projects.",
+                Text = "2016 = default standard (TDD/PKO). Switch to 2025 for latest projects.",
                 Location = new System.Drawing.Point(365, 28),
                 Size = new System.Drawing.Size(535, 18),
                 Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Italic),
@@ -200,8 +214,8 @@ namespace ETAB_Automation
                 Size = new System.Drawing.Size(310, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            // Initially populate for IS 2025 (default)
-            PopulateSeismicZones2025();
+            // Initially populate for IS 2016 (default)
+            PopulateSeismicZones2016();
             cmbSeismicZone.SelectedIndex = 0;
             cmbSeismicZone.SelectedIndexChanged += (s, ev) => RefreshWallThicknessDefaults();
             grpS.Controls.Add(cmbSeismicZone);
@@ -330,7 +344,7 @@ namespace ETAB_Automation
                 Name = "WallGrade",
                 HeaderText = "Wall Concrete Grade (bottom → top)",
                 DataSource = new System.Collections.Generic.List<string>
-                    { "M20","M25","M30","M35","M40","M45","M50","M55","M60" },
+                    { "M20","M25","M30","M35","M40","M45","M50","M55","M60","M65","M70" },
                 Width = 200
             });
             dgvGradeSchedule.Columns.Add(new DataGridViewTextBoxColumn
@@ -501,26 +515,26 @@ namespace ETAB_Automation
                 15, 20, 890, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
             const int ry1 = 42;
-            AddLabel(grp, "Core Wall (mm):", C1L, ry1, C1N - C1L - 5, 20);
+            AddLabel(grp, "Core Wall  (mm):", C1L, ry1, C1N - C1L - 5, 20);
             numCoreWallOverridePerFloor[floorType] =
                 AddNumericCtrl(grp, C1N, ry1 - 2, 100, 700, gplCore, increment: 25);
             AddLabel(grp, $"GPL: {gplCore}", C1N + NW + 4, ry1 + 2, 62, 16,
                 italic: true, color: System.Drawing.Color.DimGray, fontSize: 7.5f);
 
-            AddLabel(grp, "Periph. Dead Wall (mm):", C2L, ry1, C2N - C2L - 5, 20);
+            AddLabel(grp, "Periph. Dead Wall  (mm):", C2L, ry1, C2N - C2L - 5, 20);
             numPeriphDeadWallOverridePerFloor[floorType] =
                 AddNumericCtrl(grp, C2N, ry1 - 2, 100, 700, gplPerDead, increment: 25);
             AddLabel(grp, $"GPL: {gplPerDead}", C2N + NW + 4, ry1 + 2, 62, 16,
                 italic: true, color: System.Drawing.Color.DimGray, fontSize: 7.5f);
 
-            AddLabel(grp, "Periph. Portal Wall (mm):", C3L, ry1, C3N - C3L - 5, 20);
+            AddLabel(grp, "Periph. Portal Wall  (mm):", C3L, ry1, C3N - C3L - 5, 20);
             numPeriphPortalWallOverridePerFloor[floorType] =
                 AddNumericCtrl(grp, C3N, ry1 - 2, 100, 700, gplPerPortal, increment: 25);
             toolTip.SetToolTip(numPeriphPortalWallOverridePerFloor[floorType],
                 $"GPL table value for {numFloors} floors, {seisZone}: {gplPerPortal} mm");
 
             const int ry2 = 80;
-            AddLabel(grp, "Internal Wall (mm):", C1L, ry2, C1N - C1L - 5, 20);
+            AddLabel(grp, "Internal Wall  (mm):", C1L, ry2, C1N - C1L - 5, 20);
             numInternalWallOverridePerFloor[floorType] =
                 AddNumericCtrl(grp, C1N, ry2 - 2, 100, 700, gplInternal, increment: 25);
             AddLabel(grp, $"GPL: {gplInternal}", C1N + NW + 4, ry2 + 2, 62, 16,
@@ -659,6 +673,8 @@ namespace ETAB_Automation
                 color: System.Drawing.Color.DarkSlateGray);
             AddLabel(grp, "Width (mm)", hDepthX + hNudGap, 40, NW, 18, bold: true, fontSize: 8.5f,
                 color: System.Drawing.Color.DarkSlateGray);
+            //AddLabel(grp, "Wall Load Pattern", hDepthX + hNudGap * 2 + 10, 40, 180, 18, bold: true, fontSize: 8.5f,
+            //    color: System.Drawing.Color.DarkSlateGray);
 
             int gy = 64;
 
@@ -802,12 +818,12 @@ namespace ETAB_Automation
                 20, y, 920, yellowH);
 
             AddLabel(grpYellow,
-                "Enter slab thickness (mm).",
+                "Enter slab thickness (mm). These layers use a fixed user-defined thickness.",
                 15, 18, 880, 16, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 8);
 
             const int tCol = 140;
-            AddLabel(grpYellow, "Thickness", tCol, 2, NW, 14, bold: true, fontSize: 7.5f, color: System.Drawing.Color.DarkSlateGray);
-            AddLabel(grpYellow, "Thickness", tCol + 390, 2, NW, 14, bold: true, fontSize: 7.5f, color: System.Drawing.Color.DarkSlateGray);
+            AddLabel(grpYellow, "Thickness (mm)", tCol - 10, 2, NW + 30, 14, bold: true, fontSize: 7.5f, color: System.Drawing.Color.DarkSlateGray);
+            AddLabel(grpYellow, "Thickness (mm)", tCol + 380, 2, NW + 30, 14, bold: true, fontSize: 7.5f, color: System.Drawing.Color.DarkSlateGray);
 
             const int sr = 32;
             int sy = 36;
@@ -857,8 +873,11 @@ namespace ETAB_Automation
                 return;
             }
 
-            while (tabControl.TabPages.Count > 3)
-                tabControl.TabPages.RemoveAt(3);
+            // Keep the 4 fixed tabs: Building Config, Concrete Grades,
+            // Loads & Load Sets, Slab Thickness Rules (indices 0-3).
+            // Remove only the dynamically-generated CAD Import tabs (index 4+).
+            while (tabControl.TabPages.Count > 4)
+                tabControl.TabPages.RemoveAt(4);
 
             ClearAllFloorDicts();
 
@@ -1083,49 +1102,131 @@ namespace ETAB_Automation
             int y = 15;
 
             AddLabel(tab,
-                "📋 Beam load pattern names + individual slab load magnitudes (kN/m²)",
+                "📋 Beam load pattern names  |  Slab loads in kN/m²  |  Beam wall UDL magnitude (kN/m) — multiplied ×1000 → N/m in ETABS",
                 20, y, 900, 24, bold: true, color: System.Drawing.Color.DarkBlue, fontSize: 11);
             y += 32;
 
             // ── BEAM WALL LOAD SETS ──────────────────────────────────────
             int beamRows = 10;
-            var grpBeam = AddGroupBox(tab, "Beam Wall Load Sets", 20, y, 910, 40 + beamRows * 32 + 16);
+            var grpBeam = AddGroupBox(tab, "Beam Wall Load Sets  &  Wall Load Magnitude (kN/m)", 20, y, 910, 40 + beamRows * 32 + 36);
             AddLabel(grpBeam,
-                "ETABS load pattern name assigned to each beam type's wall UDL.",
+                "Enter ETABS load pattern name and wall UDL magnitude (kN/m). Dir=10 (Gravity). Value ×1000 → N/m internally.",
                 15, 18, 880, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 9);
 
+            // Column headers
+            // AFTER
+            const int bLblW = 230, bTxX = 245, bTxW = 210;  // ← increased from 175 to 210
+            const int magNudX = 470, magNudW = 90, bRH = 32; // ← shift magNudX right by 35 to match
             int by = 40;
-            const int bLblW = 260, bTxX = 280, bTxW = 220, bRH = 32;
 
-            System.Windows.Forms.TextBox MakeBeamLS(string label, string defVal)
+            AddLabel(grpBeam, "Beam Type", 20, by - 16, bLblW, 16, bold: true, fontSize: 8.5f, color: System.Drawing.Color.DarkSlateGray);
+            AddLabel(grpBeam, "ETABS Load Pattern Name", bTxX, by - 16, bTxW, 16, bold: true, fontSize: 8.5f, color: System.Drawing.Color.DarkSlateGray);
+            AddLabel(grpBeam, "Load (kN/m)  [×1000 = N/m]", magNudX, by - 16, 200, 16, bold: true, fontSize: 8.5f, color: System.Drawing.Color.DarkRed);
+
+            // Helper: creates one TextBox + one NumericUpDown for a beam row, advances by
+            void AddBeamLoadRow(string rowLabel, string defaultPattern, double defaultKNm,
+                out System.Windows.Forms.TextBox txOut, out NumericUpDown nudOut)
             {
-                AddLabel(grpBeam, label, 20, by, bLblW, 22, fontSize: 9f);
-                var tb = new System.Windows.Forms.TextBox
+                AddLabel(grpBeam, rowLabel, 20, by, bLblW, 22, fontSize: 9f);
+
+                //txOut = new System.Windows.Forms.TextBox
+                //{
+                //    Location = new System.Drawing.Point(bTxX, by - 2),
+                //    Size = new System.Drawing.Size(bTxW, 26),
+                //    Text = defaultPattern,
+                //    Font = new System.Drawing.Font("Segoe UI", 9F),
+                //    BackColor = System.Drawing.Color.FromArgb(255, 255, 220)
+                //};
+                //grpBeam.Controls.Add(txOut);
+                // In your AddBeamLoadRow helper, change the TextBox creation:
+                txOut = new System.Windows.Forms.TextBox
                 {
                     Location = new System.Drawing.Point(bTxX, by - 2),
                     Size = new System.Drawing.Size(bTxW, 26),
-                    Text = defVal,
+                    Text = defaultPattern,
                     Font = new System.Drawing.Font("Segoe UI", 9F),
-                    BackColor = System.Drawing.Color.FromArgb(255, 255, 220)
+                    BackColor = System.Drawing.Color.FromArgb(255, 255, 220),
+                    TextAlign = HorizontalAlignment.Left,  // explicit
                 };
-                grpBeam.Controls.Add(tb);
-                toolTip.SetToolTip(tb, $"ETABS load pattern name for {label.TrimEnd(':')}.");
+                grpBeam.Controls.Add(txOut);
+
+                //// Add this AFTER adding to Controls — sets internal left margin of 4px
+                //SendMessage(txOut.Handle, 0xD3 /*EM_SETMARGINS*/, 1 /*EC_LEFTMARGIN*/, 6);
+                toolTip.SetToolTip(txOut, $"ETABS load pattern name for {rowLabel.TrimEnd(':')}.");
+
+                nudOut = new NumericUpDown
+                {
+                    Location = new System.Drawing.Point(magNudX, by - 2),
+                    Size = new System.Drawing.Size(magNudW, 26),
+                    Minimum = 0,
+                    Maximum = 999,
+                    DecimalPlaces = 2,
+                    Increment = 0.5M,
+                    Value = (decimal)defaultKNm,
+                    Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold),
+                    BackColor = System.Drawing.Color.FromArgb(200, 230, 255)
+                };
+                grpBeam.Controls.Add(nudOut);
+                toolTip.SetToolTip(nudOut,
+                    $"Wall UDL for {rowLabel.TrimEnd(':')} in kN/m. " +
+                    "Multiplied ×1000 → N/m before ETABS SetLoadDistributed. Dir=10 (Gravity). " +
+                    "Example: enter 6 → 6000 N/m.");
+                AddLabel(grpBeam, "kN/m", magNudX + magNudW + 4, by + 3, 45, 18,
+                    color: System.Drawing.Color.DimGray, fontSize: 8.5f);
+
                 by += bRH;
-                return tb;
             }
 
-            txtSharedInternalGravityLoadSet = MakeBeamLS("B-Internal Gravity:", "WALL LOAD");
-            txtSharedCantileverGravityLoadSet = MakeBeamLS("B-Cantilever Gravity:", "WALL LOAD");
-            txtSharedEDeckGravityLoadSet = MakeBeamLS("B-EDeck Gravity:", "WALL LOAD");
-            txtSharedPodiumGravityLoadSet = MakeBeamLS("B-Podium Gravity:", "WALL LOAD");
-            txtSharedGroundGravityLoadSet = MakeBeamLS("B-Ground Gravity:", "WALL LOAD");
-            txtSharedBasementGravityLoadSet = MakeBeamLS("B-Basement Gravity:", "WALL LOAD");
-            txtSharedCoreMainLoadSet = MakeBeamLS("B-Core Main:", "WALL LOAD");
-            txtSharedPeripheralDeadMainLoadSet = MakeBeamLS("B-Periph. Dead Main:", "WALL LOAD");
-            txtSharedPeripheralPortalMainLoadSet = MakeBeamLS("B-Periph. Portal Main:", "WALL LOAD");
-            txtSharedInternalMainLoadSet = MakeBeamLS("B-Internal Main:", "WALL LOAD");
+            // Declare temp NUD variables, then assign to instance fields
+            NumericUpDown _nud;
+            System.Windows.Forms.TextBox _tx;
 
-            y += 40 + beamRows * 32 + 24;
+            AddBeamLoadRow("B-Internal Gravity:", "WALL LOAD", 6.0, out _tx, out _nud);
+            txtSharedInternalGravityLoadSet = _tx;
+            nudSharedInternalGravityLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Cantilever Gravity:", "WALL LOAD", 6.0, out _tx, out _nud);
+            txtSharedCantileverGravityLoadSet = _tx;
+            nudSharedCantileverGravityLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-EDeck Gravity:", "WALL LOAD", 6.0, out _tx, out _nud);
+            txtSharedEDeckGravityLoadSet = _tx;
+            nudSharedEDeckGravityLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Podium Gravity:", "WALL LOAD", 6.0, out _tx, out _nud);
+            txtSharedPodiumGravityLoadSet = _tx;
+            nudSharedPodiumGravityLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Ground Gravity:", "WALL LOAD", 6.0, out _tx, out _nud);
+            txtSharedGroundGravityLoadSet = _tx;
+            nudSharedGroundGravityLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Basement Gravity:", "WALL LOAD", 6.0, out _tx, out _nud);
+            txtSharedBasementGravityLoadSet = _tx;
+            nudSharedBasementGravityLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Core Main:", "WALL LOAD", 8.0, out _tx, out _nud);
+            txtSharedCoreMainLoadSet = _tx;
+            nudSharedCoreMainLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Periph. Dead Main:", "WALL LOAD", 8.0, out _tx, out _nud);
+            txtSharedPeripheralDeadMainLoadSet = _tx;
+            nudSharedPeripheralDeadMainLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Periph. Portal Main:", "WALL LOAD", 8.0, out _tx, out _nud);
+            txtSharedPeripheralPortalMainLoadSet = _tx;
+            nudSharedPeripheralPortalMainLoadMag = new[] { _nud };
+
+            AddBeamLoadRow("B-Internal Main:", "WALL LOAD", 8.0, out _tx, out _nud);
+            txtSharedInternalMainLoadSet = _tx;
+            nudSharedInternalMainLoadMag = new[] { _nud };
+
+            // Info note
+            AddLabel(grpBeam,
+                "💡 Magnitude in kN/m.  ×1000 → N/m in ETABS API.  Dir=10 (Gravity, downward).  Uniform UDL: Dist1=0.0, Dist2=1.0.",
+                15, by + 2, 880, 18, italic: true, color: System.Drawing.Color.DarkBlue, fontSize: 8.5f);
+
+            y += 40 + beamRows * 32 + 44;
 
             // ── SLAB INDIVIDUAL LOADS ────────────────────────────────────
             var allSlabs = new (string lbl, string key)[]
@@ -1186,7 +1287,7 @@ namespace ETAB_Automation
             int totalH = dataY + allSlabs.Length * rowH + 36;
 
             var grpSlab = AddGroupBox(tab,
-                "Slab Individual Loads (kN/m²) — edit values, applied per load pattern",
+                "Slab Individual Loads — all values in kN/m²  (edit per slab layer, applied per load pattern)",
                 20, y, Math.Max(totalW + 20, 960), totalH);
 
             AddLabel(grpSlab,
@@ -1284,5 +1385,250 @@ namespace ETAB_Automation
                 sharedSlabIndividualLoadControls[sKey] = nuds;
             }
         }
+
+        // ====================================================================
+        // SLAB THICKNESS RULES TAB
+        // WHITE slabs  → area-based rules  (m²  → mm thickness)
+        // CYAN slabs   → cantilever span rules (m → mm thickness)
+        // YELLOW slabs → fixed user thickness (already on per-floor CAD tabs)
+        // ====================================================================
+
+        private void InitializeSlabThicknessRulesTab(TabPage tab)
+        {
+            tab.AutoScroll = true;
+            int y = 15;
+
+            AddLabel(tab,
+                "📐 Slab Thickness Rules — edit thresholds, changes apply to all floors",
+                20, y, 900, 24, bold: true, color: System.Drawing.Color.DarkBlue, fontSize: 11);
+            y += 30;
+
+            AddLabel(tab,
+                "WHITE layers use area-based rules. CYAN (cantilever) layers use span-based rules. " +
+                "YELLOW layers use fixed thicknesses defined in the CAD Import tab per floor.",
+                20, y, 900, 18, italic: true, color: System.Drawing.Color.DarkGreen, fontSize: 9f);
+            y += 28;
+
+            // ── AREA RULES (WHITE slabs) ──────────────────────────────────────
+            const int colT = 30;         // thickness column x
+            const int colA = 180;        // area/span column x
+            const int nudW = 120;
+            const int nudH = 28;
+            const int rowH = 36;
+            const int btnW = 110;
+
+            var defaultAreaRules = FloorTypeConfig.DefaultSlabAreaRules;
+            int areaTableH = 60 + defaultAreaRules.Count * rowH + 50;
+            var grpArea = AddGroupBox(tab, "⬜ WHITE Slab — Area Rules  (slab area m²  →  thickness mm)", 20, y, 500, areaTableH);
+
+            AddLabel(grpArea, "Thickness (mm)", colT, 22, 145, 18,
+                bold: true, color: System.Drawing.Color.DarkSlateBlue, fontSize: 9f);
+            AddLabel(grpArea, "Max Area (m²)", colA, 22, 145, 18,
+                bold: true, color: System.Drawing.Color.DarkSlateBlue, fontSize: 9f);
+            AddLabel(grpArea,
+                "If slab area ≤ Max Area → use this Thickness. Rows evaluated top-to-bottom.",
+                colT, 40, 450, 16, italic: true, color: System.Drawing.Color.Gray, fontSize: 8.5f);
+
+            int ary = 60;
+            slabAreaRuleControls.Clear();
+
+            void AddAreaRow(int thickDef, double areaDef)
+            {
+                var nudT = new NumericUpDown
+                {
+                    Location = new System.Drawing.Point(colT, ary),
+                    Size = new System.Drawing.Size(nudW, nudH),
+                    Minimum = 50,
+                    Maximum = 500,
+                    Increment = 5,
+                    Value = thickDef,
+                    Font = new System.Drawing.Font("Segoe UI", 9.5F),
+                    BackColor = System.Drawing.Color.FromArgb(255, 255, 200),
+                    BorderStyle = BorderStyle.FixedSingle,
+                    DecimalPlaces = 0
+                };
+                var nudA = new NumericUpDown
+                {
+                    Location = new System.Drawing.Point(colA, ary),
+                    Size = new System.Drawing.Size(nudW, nudH),
+                    Minimum = 0,
+                    Maximum = 5000,
+                    Increment = 1,
+                    DecimalPlaces = 1,
+                    Value = (decimal)areaDef,
+                    Font = new System.Drawing.Font("Segoe UI", 9.5F),
+                    BackColor = System.Drawing.Color.FromArgb(200, 240, 255),
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+                grpArea.Controls.Add(nudT);
+                grpArea.Controls.Add(nudA);
+                toolTip.SetToolTip(nudT, "Slab thickness in mm assigned when area ≤ Max Area.");
+                toolTip.SetToolTip(nudA, "Upper area limit (m²). Slabs with area ≤ this value get the thickness on the left.");
+                slabAreaRuleControls.Add(new[] { nudT, nudA });
+                ary += rowH;
+            }
+
+            foreach (var r in defaultAreaRules)
+                AddAreaRow(r.thickness, r.maxArea);
+
+            // Add / Remove row buttons
+            var btnAddArea = new Button
+            {
+                Text = "+ Add Row",
+                Location = new System.Drawing.Point(colT, ary + 4),
+                Size = new System.Drawing.Size(btnW, 28),
+                Font = new System.Drawing.Font("Segoe UI", 8.5F),
+                BackColor = System.Drawing.Color.FromArgb(200, 230, 200)
+            };
+            var btnRemArea = new Button
+            {
+                Text = "− Remove Last",
+                Location = new System.Drawing.Point(colT + btnW + 8, ary + 4),
+                Size = new System.Drawing.Size(btnW + 10, 28),
+                Font = new System.Drawing.Font("Segoe UI", 8.5F),
+                BackColor = System.Drawing.Color.FromArgb(255, 210, 210)
+            };
+
+            btnAddArea.Click += (s, e) =>
+            {
+                int newY = 60 + slabAreaRuleControls.Count * rowH;
+                // Shift buttons down
+                btnAddArea.Top += rowH;
+                btnRemArea.Top += rowH;
+                grpArea.Height += rowH;
+                // Shift cantilever group and everything below
+                // (AutoScroll handles overflow; just grow the group)
+                ary = newY;
+                AddAreaRow(150, 22);
+            };
+            btnRemArea.Click += (s, e) =>
+            {
+                if (slabAreaRuleControls.Count <= 1) return;
+                var last = slabAreaRuleControls[slabAreaRuleControls.Count - 1];
+                foreach (var n in last) grpArea.Controls.Remove(n);
+                slabAreaRuleControls.RemoveAt(slabAreaRuleControls.Count - 1);
+                btnAddArea.Top -= rowH;
+                btnRemArea.Top -= rowH;
+                grpArea.Height -= rowH;
+                ary -= rowH;
+            };
+
+            grpArea.Controls.Add(btnAddArea);
+            grpArea.Controls.Add(btnRemArea);
+
+            y += areaTableH + 20;
+
+            // ── CANTILEVER RULES (CYAN slabs) ─────────────────────────────────
+            var defaultCantRules = FloorTypeConfig.DefaultSlabCantileverRules;
+            int cantTableH = 60 + defaultCantRules.Count * rowH + 50;
+            var grpCant = AddGroupBox(tab,
+                "🔵 CYAN Slab (Cantilever) — Span Rules  (cantilever span m  →  thickness mm)",
+                20, y, 500, cantTableH);
+
+            AddLabel(grpCant, "Thickness (mm)", colT, 22, 145, 18,
+                bold: true, color: System.Drawing.Color.DarkSlateBlue, fontSize: 9f);
+            AddLabel(grpCant, "Max Span (m)", colA, 22, 145, 18,
+                bold: true, color: System.Drawing.Color.DarkSlateBlue, fontSize: 9f);
+            AddLabel(grpCant,
+                "If shortest edge ≤ Max Span → use this Thickness. Rows evaluated top-to-bottom.",
+                colT, 40, 450, 16, italic: true, color: System.Drawing.Color.Gray, fontSize: 8.5f);
+
+            int cry = 60;
+            slabCantileverRuleControls.Clear();
+
+            void AddCantRow(int thickDef, double spanDef)
+            {
+                var nudT = new NumericUpDown
+                {
+                    Location = new System.Drawing.Point(colT, cry),
+                    Size = new System.Drawing.Size(nudW, nudH),
+                    Minimum = 50,
+                    Maximum = 500,
+                    Increment = 5,
+                    Value = thickDef,
+                    Font = new System.Drawing.Font("Segoe UI", 9.5F),
+                    BackColor = System.Drawing.Color.FromArgb(255, 255, 200),
+                    BorderStyle = BorderStyle.FixedSingle,
+                    DecimalPlaces = 0
+                };
+                var nudS = new NumericUpDown
+                {
+                    Location = new System.Drawing.Point(colA, cry),
+                    Size = new System.Drawing.Size(nudW, nudH),
+                    Minimum = 0,
+                    Maximum = 50,
+                    Increment = 0.1M,
+                    DecimalPlaces = 2,
+                    Value = (decimal)spanDef,
+                    Font = new System.Drawing.Font("Segoe UI", 9.5F),
+                    BackColor = System.Drawing.Color.FromArgb(200, 230, 255),
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+                grpCant.Controls.Add(nudT);
+                grpCant.Controls.Add(nudS);
+                toolTip.SetToolTip(nudT, "Slab thickness in mm for cantilever slabs with span ≤ Max Span.");
+                toolTip.SetToolTip(nudS, "Maximum cantilever span (m). Slabs with span ≤ this value get the thickness on the left.");
+                slabCantileverRuleControls.Add(new[] { nudT, nudS });
+                cry += rowH;
+            }
+
+            foreach (var r in defaultCantRules)
+                AddCantRow(r.thickness, r.maxSpan);
+
+            var btnAddCant = new Button
+            {
+                Text = "+ Add Row",
+                Location = new System.Drawing.Point(colT, cry + 4),
+                Size = new System.Drawing.Size(btnW, 28),
+                Font = new System.Drawing.Font("Segoe UI", 8.5F),
+                BackColor = System.Drawing.Color.FromArgb(200, 230, 200)
+            };
+            var btnRemCant = new Button
+            {
+                Text = "− Remove Last",
+                Location = new System.Drawing.Point(colT + btnW + 8, cry + 4),
+                Size = new System.Drawing.Size(btnW + 10, 28),
+                Font = new System.Drawing.Font("Segoe UI", 8.5F),
+                BackColor = System.Drawing.Color.FromArgb(255, 210, 210)
+            };
+
+            btnAddCant.Click += (s, e) =>
+            {
+                int newY = 60 + slabCantileverRuleControls.Count * rowH;
+                btnAddCant.Top += rowH;
+                btnRemCant.Top += rowH;
+                grpCant.Height += rowH;
+                cry = newY;
+                AddCantRow(200, 2.0);
+            };
+            btnRemCant.Click += (s, e) =>
+            {
+                if (slabCantileverRuleControls.Count <= 1) return;
+                var last = slabCantileverRuleControls[slabCantileverRuleControls.Count - 1];
+                foreach (var n in last) grpCant.Controls.Remove(n);
+                slabCantileverRuleControls.RemoveAt(slabCantileverRuleControls.Count - 1);
+                btnAddCant.Top -= rowH;
+                btnRemCant.Top -= rowH;
+                grpCant.Height -= rowH;
+                cry -= rowH;
+            };
+
+            grpCant.Controls.Add(btnAddCant);
+            grpCant.Controls.Add(btnRemCant);
+
+            y += cantTableH + 20;
+
+            // ── YELLOW reminder ───────────────────────────────────────────────
+            var grpYellow = AddGroupBox(tab,
+                "🟡 YELLOW Slab — Fixed User Thickness  (not affected by rules above)",
+                20, y, 500, 60);
+            AddLabel(grpYellow,
+                "Lobby, Staircase, Fire Tender, OHT, Terrace Fire Tank, UGT, Landscape, Swimming, DG, STP\n" +
+                "Thickness for these is set per-floor in the CAD Import tab.",
+                colT, 20, 460, 34, italic: false, color: System.Drawing.Color.DimGray, fontSize: 9f);
+        }
     }
 }
+
+
+

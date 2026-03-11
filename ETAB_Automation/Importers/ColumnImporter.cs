@@ -1,4 +1,5 @@
 ﻿
+
 // ============================================================================
 // FILE: Importers/ColumnImporter.cs — VERSION 2.0
 // ============================================================================
@@ -433,7 +434,7 @@ namespace ETABS_CAD_Automation.Importers
                     cx, cy, topZ,
                     ref frameName,
                     sectionName,
-                    storyName + "_COL");
+                    storyName);   // must match exact ETABS story name for correct hierarchy
 
                 if (ret != 0)
                 {

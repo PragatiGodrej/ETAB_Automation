@@ -1,6 +1,10 @@
 ﻿
 
 
+
+
+
+
 // ============================================================================
 // FILE: Importers/BeamImporterEnhanced.cs
 // ============================================================================
@@ -77,6 +81,10 @@ namespace ETABS_CAD_Automation.Importers
 
         private Dictionary<string, string> etabsLoadPatterns;
 
+        // Key   = same as beamWallLoadSets (e.g. "InternalGravity")
+        // Value = magnitude in N/m entered by user in UI (kN/m × 1000)
+        private Dictionary<string, double> uiLoadMagnitudes;
+
         // ====================================================================
         // CONSTRUCTOR
         // ====================================================================
@@ -89,7 +97,8 @@ namespace ETABS_CAD_Automation.Importers
             Dictionary<string, int> depths,
             GradeScheduleManager gradeManager = null,
             Dictionary<string, int> widthOverrides = null,
-            Dictionary<string, string> wallLoadSets = null)
+            Dictionary<string, string> wallLoadSets = null,
+            Dictionary<string, double> wallLoadMagnitudes = null)
         {
             sapModel = model;
             dxfDoc = doc;
@@ -99,6 +108,13 @@ namespace ETABS_CAD_Automation.Importers
             gradeSchedule = gradeManager;
             beamWidthOverrides = widthOverrides ?? new Dictionary<string, int>();
             beamWallLoadSets = wallLoadSets ?? new Dictionary<string, string>();
+
+            // Convert kN/m → N/m for internal use
+            uiLoadMagnitudes = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            if (wallLoadMagnitudes != null)
+                foreach (var kv in wallLoadMagnitudes)
+                    if (kv.Value > 0)
+                        uiLoadMagnitudes[kv.Key] = kv.Value * 1000.0;
 
             LoadBeamSections();
             LoadEtabsLoadPatterns();
@@ -143,6 +159,7 @@ namespace ETABS_CAD_Automation.Importers
                     $"⚠ BEAM LoadEtabsLoadPatterns: {ex.Message}");
             }
         }
+
 
         // ====================================================================
         // STEP 2 — Fuzzy-resolve user name → exact ETABS Load Pattern name
@@ -570,8 +587,18 @@ namespace ETABS_CAD_Automation.Importers
                 return;
             }
 
+            // ── Resolve magnitude from UI (Wall Load Patterns tab, kN/m → N/m in constructor) ──
+            if (!uiLoadMagnitudes.TryGetValue(loadSetKey, out double loadMagN) || loadMagN <= 0)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"  ⚠ BEAM: Magnitude for '{loadSetKey}' is 0 — enter a kN/m value in the " +
+                    "Wall Load Patterns tab. Skipping.");
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine(
-                $"  → Assigning Load Pattern '{patternName}' to {frameNames.Count} beam(s)");
+                $"  → Assigning Load Pattern '{patternName}' " +
+                $"@ {loadMagN / 1000.0:F2} kN/m (from UI) to {frameNames.Count} beam(s)");
 
             int ok = 0, fail = 0;
             foreach (string name in frameNames)
@@ -585,8 +612,8 @@ namespace ETABS_CAD_Automation.Importers
                         10,           // Dir    : 10 = Gravity (downward) for ETABS 2026
                         0.0,          // Dist1  : relative start (0.0 = End-I)
                         1.0,          // Dist2  : relative end   (1.0 = End-J)
-                        6000.0,       // Val1   : 6 kN/m at start
-                        6000.0,       // Val2   : 6 kN/m at end
+                        loadMagN,     // Val1   : magnitude read from ETABS (N/m)
+                        loadMagN,     // Val2   : magnitude read from ETABS (N/m)
                         "Global",
                         true,         // RelDist : true = relative distances
                         true);        // Replace : true = replace existing load

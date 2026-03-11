@@ -1,5 +1,6 @@
 ﻿
 
+
 //// ============================================================================
 //// FILE: Core/StoryManager.cs — VERSION 6.2
 ////
@@ -280,8 +281,15 @@ namespace ETAB_Automation.Core
 
         public int GetStoryCount() => storyBaseElevations.Count;
 
+        /// <summary>
+        /// Returns the ETABS cumulative height of the last story (Plan View Z of Terrace).
+        /// This is the true structural building height — columns, summary, and all
+        /// geometry must not exceed this value.
+        /// NOTE: geomTop of the last story is NOT used here because it includes raw
+        /// slab thickness (e.g. 150mm) which pushes the value above the ETABS boundary.
+        /// </summary>
         public double GetTotalBuildingHeight()
-            => storyTopElevations.Count == 0 ? 0 : storyTopElevations[storyTopElevations.Count - 1];
+            => planViewElevations.Count == 0 ? 0 : planViewElevations[planViewElevations.Count - 1];
 
         // ====================================================================
         // PRIVATE HELPERS

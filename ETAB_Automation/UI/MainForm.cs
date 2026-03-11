@@ -1,6 +1,7 @@
 ﻿
 
 
+
 //// ============================================================================
 //// END OF FILE
 //// ============================================================================
@@ -175,7 +176,10 @@ namespace ETAB_Automation
                         storyHeights.AddRange(rawHeights);
                     }
 
-                    double totalHeight = rawHeights.Sum();
+                    // Use storyHeights (ETABS heights after shift) not rawHeights.
+                    // rawHeights.Sum() includes the orphaned Terrace raw height (e.g. 3m)
+                    // that is never consumed as an ETABS height when foundationHeight > 0.
+                    double totalHeight = storyHeights.Sum();
 
                     // ── Grade schedule validation ────────────────────────────
                     int gradeTotal = floorsPerGrade.Sum();

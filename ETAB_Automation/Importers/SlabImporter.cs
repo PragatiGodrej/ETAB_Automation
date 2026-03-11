@@ -1,5 +1,6 @@
 ﻿
 
+
 // ============================================================================
 // FILE: Importers/SlabImporterEnhanced.cs
 // ============================================================================
@@ -76,23 +77,14 @@ namespace ETABS_CAD_Automation.Importers
         // (Uniform Load Set cache removed — loads are now assigned per-pattern directly)
 
         // ====================================================================
-        // THICKNESS RULES
+        // THICKNESS RULES  (instance — editable via constructor, not hardcoded)
         // ====================================================================
 
-        // WHITE layers — area-based (area in m²)
-        private static readonly List<(int thickness, double maxArea)> AreaRules =
-            new List<(int, double)>
-            {
-                (125, 14), (135, 17), (150, 22), (160, 25),
-                (175, 32), (200, 42), (250, 70)
-            };
+        // WHITE layers — area-based (area in m²): (thicknessMm, maxAreaM2)
+        private readonly List<(int thickness, double maxArea)> AreaRules;
 
-        // CYAN layers — cantilever span-based (span in m)
-        private static readonly List<(int thickness, double maxSpan)> CantileverRules =
-            new List<(int, double)>
-            {
-                (125, 1.0), (160, 1.5), (180, 1.8), (200, 5.0)
-            };
+        // CYAN layers — cantilever span-based (span in m): (thicknessMm, maxSpanM)
+        private readonly List<(int thickness, double maxSpan)> CantileverRules;
 
         // ====================================================================
         // LAYER CLASSIFICATION
@@ -144,12 +136,27 @@ namespace ETABS_CAD_Automation.Importers
             DxfDocument doc,
             Dictionary<string, int> config = null,
             GradeScheduleManager gradeManager = null,
-            Dictionary<string, SlabLoads> loadData = null)
+            Dictionary<string, SlabLoads> loadData = null,
+            List<(int thickness, double maxArea)> areaRules = null,
+            List<(int thickness, double maxSpan)> cantileverRules = null)
         {
             sapModel = model;
             dxfDoc = doc;
             gradeSchedule = gradeManager;
             slabLoadData = loadData ?? new Dictionary<string, SlabLoads>();
+
+            // Use user-supplied rules if provided and non-empty; else fall back to defaults
+            AreaRules = (areaRules != null && areaRules.Count > 0)
+                ? areaRules
+                : FloorTypeConfig.DefaultSlabAreaRules;
+
+            CantileverRules = (cantileverRules != null && cantileverRules.Count > 0)
+                ? cantileverRules
+                : FloorTypeConfig.DefaultSlabCantileverRules;
+
+            System.Diagnostics.Debug.WriteLine(
+                $"SlabImporter: AreaRules={AreaRules.Count} rows, " +
+                $"CantileverRules={CantileverRules.Count} rows");
 
             slabConfig = config ?? new Dictionary<string, int>
             {
@@ -366,6 +373,9 @@ namespace ETABS_CAD_Automation.Importers
                         int t = ThicknessFromSpan(span);
                         System.Diagnostics.Debug.WriteLine(
                             $"  CYAN [{layerName}]: span={span:F2}m → {t}mm");
+                        // Try to create exact section first, fall back to closest
+                        string exact = SectionDefiner.EnsureSlabSection(sapModel, t, preferredGrade);
+                        if (!string.IsNullOrEmpty(exact)) return exact;
                         return GetClosestSlabSection(t, preferredGrade);
                     }
                 case SlabRule.UserThickness:
@@ -373,6 +383,8 @@ namespace ETABS_CAD_Automation.Importers
                         int t = GetUserThickness(layerName.ToUpperInvariant().Trim());
                         System.Diagnostics.Debug.WriteLine(
                             $"  YELLOW [{layerName}]: {t}mm (user input)");
+                        string exact = SectionDefiner.EnsureSlabSection(sapModel, t, preferredGrade);
+                        if (!string.IsNullOrEmpty(exact)) return exact;
                         return GetClosestSlabSection(t, preferredGrade);
                     }
                 default: // AreaBased (WHITE)
@@ -381,6 +393,8 @@ namespace ETABS_CAD_Automation.Importers
                         int t = ThicknessFromArea(area);
                         System.Diagnostics.Debug.WriteLine(
                             $"  WHITE [{layerName}]: area={area:F2}m² → {t}mm");
+                        string exact = SectionDefiner.EnsureSlabSection(sapModel, t, preferredGrade);
+                        if (!string.IsNullOrEmpty(exact)) return exact;
                         return GetClosestSlabSection(t, preferredGrade);
                     }
             }
@@ -615,7 +629,7 @@ namespace ETABS_CAD_Automation.Importers
                         int ret = sapModel.AreaObj.SetLoadUniform(
                             areaName,   // area object name
                             pattern,    // ETABS load pattern name
-                            value *1000,      // kN/m² magnitude
+                            value * 1000,      // kN/m² magnitude
                             10,         // Dir=10 → Gravity (downward) for ETABS 2026
                             replace,    // Replace=true only on first pattern per slab
                             "Global");  // coordinate system

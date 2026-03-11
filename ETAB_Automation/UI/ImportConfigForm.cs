@@ -1,4 +1,10 @@
 ﻿
+
+
+
+
+
+
 // ============================================================================
 // FILE: UI/ImportConfigForm.cs (PART 1 - Main Form)
 // ============================================================================
@@ -120,6 +126,19 @@ namespace ETAB_Automation
         internal TextBox txtSharedPeripheralPortalMainLoadSet;
         internal TextBox txtSharedInternalMainLoadSet;
 
+        // ── SHARED BEAM WALL LOAD MAGNITUDES (kN/m, user input; ×1000 → N/m) ─
+        // [0] = start value (Dist1), [1] = end value (Dist2)
+        internal NumericUpDown[] nudSharedInternalGravityLoadMag;
+        internal NumericUpDown[] nudSharedCantileverGravityLoadMag;
+        internal NumericUpDown[] nudSharedEDeckGravityLoadMag;
+        internal NumericUpDown[] nudSharedPodiumGravityLoadMag;
+        internal NumericUpDown[] nudSharedGroundGravityLoadMag;
+        internal NumericUpDown[] nudSharedBasementGravityLoadMag;
+        internal NumericUpDown[] nudSharedCoreMainLoadMag;
+        internal NumericUpDown[] nudSharedPeripheralDeadMainLoadMag;
+        internal NumericUpDown[] nudSharedPeripheralPortalMainLoadMag;
+        internal NumericUpDown[] nudSharedInternalMainLoadMag;
+
         // ── Per-floor slab thicknesses — YELLOW layers ───────────────────
         internal Dictionary<string, NumericUpDown> numLobbySlabThicknessPerFloor;
         internal Dictionary<string, NumericUpDown> numStairSlabThicknessPerFloor;
@@ -137,6 +156,12 @@ namespace ETAB_Automation
         // Value = 9 NumericUpDown controls for [FF, Fill, ASDL, LL, LL>3,
         //         FireTender, TreeLoad, MachineRoom, WaterTank]
         internal Dictionary<string, NumericUpDown[]> sharedSlabIndividualLoadControls;
+
+        // ── SHARED SLAB THICKNESS RULE CONTROLS ─────────────────────────────
+        // Area rules: List of rows, each row = [thicknessNud, maxAreaNud]
+        internal List<NumericUpDown[]> slabAreaRuleControls;
+        // Cantilever rules: List of rows, each row = [thicknessNud, maxSpanNud]
+        internal List<NumericUpDown[]> slabCantileverRuleControls;
 
         // ── Per-floor wall thickness overrides ──────────────────────────
         internal Dictionary<string, NumericUpDown> numCoreWallOverridePerFloor;
@@ -204,6 +229,10 @@ namespace ETAB_Automation
             // Beam wall load set dicts
             // Shared slab individual load controls — created by InitializeLoadSetsTab()
             sharedSlabIndividualLoadControls = new Dictionary<string, NumericUpDown[]>();
+
+            // Slab thickness rule controls — created by InitializeSlabThicknessRulesTab()
+            slabAreaRuleControls = new List<NumericUpDown[]>();
+            slabCantileverRuleControls = new List<NumericUpDown[]>();
 
             // Slab thickness dicts
             numLobbySlabThicknessPerFloor = new Dictionary<string, NumericUpDown>();
@@ -669,8 +698,11 @@ namespace ETAB_Automation
                 BeamDepths = GetBeamDepthsForFloor(name),
                 BeamWidthOverrides = GetBeamWidthOverridesForFloor(name),
                 BeamWallLoadSets = GetBeamWallLoadSetsForFloor(name),
+                BeamWallLoadMagnitudes = GetBeamWallLoadMagnitudes(),
                 SlabThicknesses = GetSlabThicknessesForFloor(name),
                 SlabIndividualLoads = GetSlabIndividualLoadsForFloor(name),
+                SlabAreaRules = GetSlabAreaRules(),
+                SlabCantileverRules = GetSlabCantileverRules(),
                 WallThicknessOverrides = GetWallThicknessOverridesForFloor(name),
                 NtaWallThickness = (int)numNtaWallThicknessPerFloor[name].Value,
                 ColumnB = numColumnBPerFloor.ContainsKey(name) ? (int)numColumnBPerFloor[name].Value : 300,
@@ -759,6 +791,30 @@ namespace ETAB_Automation
             };
         }
 
+        /// <summary>
+        /// Reads user-entered start load magnitude (kN/m) from each beam row.
+        /// The value is passed as-is; BeamImporterEnhanced multiplies ×1000 internally to convert kN/m → N/m.
+        /// Both Val1 and Val2 in SetLoadDistributed use this value (uniform UDL).
+        /// </summary>
+        private Dictionary<string, double> GetBeamWallLoadMagnitudes()
+        {
+            double V(NumericUpDown[] nuds) => nuds != null && nuds.Length > 0 ? (double)nuds[0].Value : 0.0;
+            return new Dictionary<string, double>
+            {
+                ["InternalGravity"] = V(nudSharedInternalGravityLoadMag),
+                ["CantileverGravity"] = V(nudSharedCantileverGravityLoadMag),
+                ["NoLoadGravity"] = 0.0,  // explicitly no load
+                ["EdeckGravity"] = V(nudSharedEDeckGravityLoadMag),
+                ["PodiumGravity"] = V(nudSharedPodiumGravityLoadMag),
+                ["GroundGravity"] = V(nudSharedGroundGravityLoadMag),
+                ["BasementGravity"] = V(nudSharedBasementGravityLoadMag),
+                ["CoreMain"] = V(nudSharedCoreMainLoadMag),
+                ["PeripheralDeadMain"] = V(nudSharedPeripheralDeadMainLoadMag),
+                ["PeripheralPortalMain"] = V(nudSharedPeripheralPortalMainLoadMag),
+                ["InternalMain"] = V(nudSharedInternalMainLoadMag),
+            };
+        }
+
         private Dictionary<string, int> GetSlabThicknessesForFloor(string ft)
         {
             return new Dictionary<string, int>
@@ -815,6 +871,43 @@ namespace ETAB_Automation
                 ["PeriphPortalWall"] = (int)numPeriphPortalWallOverridePerFloor[ft].Value,
                 ["InternalWall"] = (int)numInternalWallOverridePerFloor[ft].Value,
             };
+        }
+
+        /// <summary>
+        /// Reads the user-edited area-based slab thickness rules from the
+        /// "Slab Thickness Rules" tab. Returns null if no controls exist yet
+        /// (SlabImporter will then use built-in defaults).
+        /// </summary>
+        private List<(int thickness, double maxArea)> GetSlabAreaRules()
+        {
+            if (slabAreaRuleControls == null || slabAreaRuleControls.Count == 0) return null;
+            var rules = new List<(int thickness, double maxArea)>();
+            foreach (var row in slabAreaRuleControls)
+            {
+                int t = (int)row[0].Value;
+                double a = (double)row[1].Value;
+                if (t > 0 && a > 0) rules.Add((t, a));
+            }
+            // Sort ascending by area so importer lookup works correctly
+            rules.Sort((x, y) => x.maxArea.CompareTo(y.maxArea));
+            return rules.Count > 0 ? rules : null;
+        }
+
+        /// <summary>
+        /// Reads the user-edited cantilever span-based slab thickness rules.
+        /// </summary>
+        private List<(int thickness, double maxSpan)> GetSlabCantileverRules()
+        {
+            if (slabCantileverRuleControls == null || slabCantileverRuleControls.Count == 0) return null;
+            var rules = new List<(int thickness, double maxSpan)>();
+            foreach (var row in slabCantileverRuleControls)
+            {
+                int t = (int)row[0].Value;
+                double s = (double)row[1].Value;
+                if (t > 0 && s > 0) rules.Add((t, s));
+            }
+            rules.Sort((x, y) => x.maxSpan.CompareTo(y.maxSpan));
+            return rules.Count > 0 ? rules : null;
         }
 
         private bool ValidateFloorConfig(string floorType)

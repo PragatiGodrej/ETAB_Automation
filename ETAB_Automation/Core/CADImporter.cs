@@ -1,39 +1,30 @@
 ﻿
 
+
+
+
 // ============================================================================
-// FILE: Core/CADImporter.cs — VERSION 4.7
+// FILE: Core/CADImporter.cs — VERSION 5.2
 //
-// ELEVATION MODEL (matches StoryManager v6.0):
+// COLUMN PLACEMENT — v5.1 (definitive fix):
+//   globalColumnDxf resolved once before loop from first config with columns.
+//   Per-floor loop places one column segment per story (geomBase → geomTop).
 //
-//   foundationHeight = 1.5m  (checked in UI → distance base to basement slab)
-//   storyHeights[0]  = 3.5m  (Basement1 wall height above its slab)
+//   FOUNDATION SPLIT FIX:
+//   For the deepest basement (needsFoundationSplit=true), geomTop includes
+//   foundationHeight + rawWallHeight. A single column spanning 0→geomTop
+//   crosses the ETABS story boundary causing wrong-story assignment.
+//   Two segments are placed to match the wall split:
+//     Segment A: Z = 0              → foundationHeight  (foundation zone)
+//     Segment B: Z = foundationHeight → geomTop          (basement zone)
+//   All other stories: one segment geomBase → geomTop as normal.
+// ============================================================================
 //
-//   ETABS Story Table:
-//     Base       = 0.0m
-//     Basement1  ETABS height=1.5  → Plan View Z=1.5m  ✓
-//     Podium1    ETABS height=3.5  → Plan View Z=5.0m  ✓
-//     Ground     ETABS height=4.5  → Plan View Z=9.5m  ✓
-//
-//   GEOMETRY PLACEMENT (CADImporter):
-//     Basement (foundationHeight > 0):
-//       Foundation walls : Z=0.000 → 1.500  (height=foundationHeight)
-//       Basement walls   : Z=1.500 → 5.000  (height=storyHeights[0]=3.5)
-//       Slab/Beams       : Z=1.505            (foundationHeight + 0.005)
-//       Columns          : Z=0.000 → 5.000   ← ALWAYS from geomBase (0.0)
-//       geomBase = storyManager.GetStoryBaseElevation() = 0.0
-//       geomTop  = storyManager.GetStoryTopElevation()  = 5.0
-//
-//     Normal stories:
-//       Walls/Slab/Beams/Columns: same as before (geomBase → geomTop)
-//
-// CHANGES from v4.6:
-//   - ColumnImporter.ImportColumns() no longer takes colB_mm / colD_mm.
-//     B and D are now read directly from each closed polyline's bounding box.
-//   - Columns ALWAYS start from geomBase (= 0.0 for basement, cumulative for others).
-//     Previously basement columns started from foundationHeight — now fixed.
-//   - Removed floorConfig.ColumnB / ColumnD guard from column block.
-//   - colHeight is always wallHt (= geomTop - geomBase), spanning full story geometry.
-//   - Debug header updated to v4.7.
+// COLUMN PLACEMENT — v4.9:
+//   Columns placed per-floor (one segment per story) inside the main loop.
+//   Each segment: geomBase → geomTop, assigned to exact ETABS storyName.
+//   ColumnImporter bug fixed: storyName (not storyName+"_COL") passed to
+//   AddByCoord so columns appear under the correct story in ETABS hierarchy.
 // ============================================================================
 
 using ETAB_Automation.Models;
@@ -104,8 +95,34 @@ namespace ETAB_Automation.Core
                 if (!ValidateCADCoordinates(floorConfigs)) return false;
 
                 WallThicknessCalculator.LoadAvailableWallSections(sapModel);
-                SectionDefiner.ResetCache();      // flush define-if-missing cache for fresh run
+                SectionDefiner.ResetCache();
                 ColumnImporter.ClearSectionCache();
+
+                // ── Resolve column CAD once — used for EVERY story ────────────
+                // Columns share the same plan geometry across all floor types.
+                // Find the first floor config that has Column layers mapped and
+                // use its CAD file for all stories (basement through terrace).
+                List<string> globalColumnLayers = null;
+                DxfDocument globalColumnDxf = null;
+
+                foreach (var fc in floorConfigs)
+                {
+                    var layers = fc.LayerMapping
+                        .Where(kv => kv.Value.Equals("Column", StringComparison.OrdinalIgnoreCase))
+                        .Select(kv => kv.Key)
+                        .ToList();
+                    if (layers.Count > 0)
+                    {
+                        globalColumnLayers = layers;
+                        globalColumnDxf = DxfDocument.Load(fc.CADFilePath);
+                        Debug.WriteLine($"✓ Column CAD resolved: {System.IO.Path.GetFileName(fc.CADFilePath)}" +
+                            $"  layers=[{string.Join(", ", layers)}]");
+                        break;
+                    }
+                }
+
+                if (globalColumnDxf == null)
+                    Debug.WriteLine("⚠ No Column layers found in any floor config — columns will be skipped.");
 
                 int currentStoryIndex = 0;
 
@@ -125,11 +142,14 @@ namespace ETAB_Automation.Core
 
                     var beamImporter = new BeamImporterEnhanced(
                         sapModel, dxfDoc, seismicZone, wallRef,
-                        floorConfig.BeamDepths, gradeSchedule, floorConfig.BeamWidthOverrides);
+                        floorConfig.BeamDepths, gradeSchedule, floorConfig.BeamWidthOverrides,
+                        floorConfig.BeamWallLoadSets, floorConfig.BeamWallLoadMagnitudes);
 
                     var slabImporter = new SlabImporterEnhanced(
                         sapModel, dxfDoc, floorConfig.SlabThicknesses, gradeSchedule,
-                        floorConfig.SlabIndividualLoads);
+                        floorConfig.SlabIndividualLoads,
+                        floorConfig.SlabAreaRules,
+                        floorConfig.SlabCantileverRules);
 
                     for (int floor = 0; floor < floorConfig.Count; floor++)
                     {
@@ -250,51 +270,53 @@ namespace ETAB_Automation.Core
                             slabImporter.ImportSlabs(floorConfig.LayerMapping, slabElev, currentStoryIndex);
                         }
 
-                        // ── COLUMNS ───────────────────────────────────────────
+                        // ── COLUMNS — one segment per story using global column CAD ──
+                        // Column base = previous story's Plan View Z (or 0 for first story).
+                        // Column top  = this story's Plan View Z (= ETABS cumulative height).
+                        // This ensures columns stay within ETABS story boundaries exactly.
                         //
-                        // v4.7 RULES:
-                        //   • B and D are READ from each polyline — no user input needed.
-                        //   • Columns ALWAYS start from geomBase (= 0.0 for basement).
-                        //   • Column height = wallHt = geomTop - geomBase (full story geometry).
-                        //
-                        // Basement example:
-                        //   geomBase = 0.0m,  geomTop = 5.0m  →  columns Z=0.0 → 5.0m  ✓
-                        //
-                        // Normal story example:
-                        //   geomBase = 5.0m,  geomTop = 9.5m  →  columns Z=5.0 → 9.5m  ✓
-
-                        var columnLayers = floorConfig.LayerMapping
-                            .Where(kv => kv.Value.Equals("Column", StringComparison.OrdinalIgnoreCase))
-                            .Select(kv => kv.Key)
-                            .ToList();
-
-                        if (columnLayers.Count > 0)
+                        // For foundation-split basement: two segments matching wall split:
+                        //   Segment A: Z = 0              → foundationHeight
+                        //   Segment B: Z = foundationHeight → slabZ (Plan View Z)
+                        if (globalColumnDxf != null && globalColumnLayers != null && globalColumnLayers.Count > 0)
                         {
-                            // Columns always start from geomBase, height = full wallHt
-                            double colBaseZ = geomBase;   // 0.0 for basement ✓
-                            double colHeight = wallHt;     // geomTop - geomBase ✓
+                            // Building top = ETABS cumulative of last story (Plan View Z of Terrace).
+                            // Hard-cap colTop here so columns NEVER exceed the ETABS model boundary.
+                            // Without this cap: when foundationHeight>0 the shift orphans Terrace's
+                            // raw height (e.g. 3m) causing colTop = 42.5+3.0 = 45.5m instead of 42.5m.
+                            double buildingTop = storyManager.GetTotalBuildingHeight();
 
-                            Debug.WriteLine($"│");
-                            Debug.WriteLine($"│    Columns  Z={colBaseZ:F3} → {colBaseZ + colHeight:F3}m" +
-                                $"  (B×D auto-measured from polylines)" +
-                                $"  layers=[{string.Join(", ", columnLayers)}]");
+                            // Column top = Plan View Z of this story, capped at building top
+                            double colTop = Math.Min(slabZ, buildingTop);
+                            // Column base = Plan View Z of previous story (0 for first story)
+                            double colBase = (currentStoryIndex == 0)
+                                ? 0.0
+                                : storyManager.GetStoryPlanViewZ(currentStoryIndex - 1);
+                            double colHt = colTop - colBase;
 
-                            var colImporter = new ColumnImporter(
-                                sapModel, dxfDoc, gradeSchedule, currentStoryIndex);
+                            if (needsFoundationSplit)
+                            {
+                                // Segment A — foundation zone: 0 → foundationHeight
+                                double htA = foundationHeight - colBase;  // colBase=0 for idx=0
+                                Debug.WriteLine($"│    Columns [A] Z={colBase:F3} → {foundationHeight:F3}m  [{storyName}]");
+                                var colA = new ColumnImporter(sapModel, globalColumnDxf, gradeSchedule, currentStoryIndex);
+                                colA.ImportColumns(globalColumnLayers, colBase, htA, storyName);
+                                Debug.WriteLine($"│    ✅ Col-A placed={colA.ColumnsCreated} failed={colA.ColumnsFailed}");
 
-                            // v2.0 signature — no colB_mm / colD_mm arguments
-                            colImporter.ImportColumns(
-                                columnLayers,
-                                colBaseZ,
-                                colHeight,
-                                storyName);
-
-                            Debug.WriteLine($"│    ✅ Columns placed={colImporter.ColumnsCreated}" +
-                                $"  failed={colImporter.ColumnsFailed}");
-                        }
-                        else
-                        {
-                            Debug.WriteLine("│    ⚠ No Column layers mapped — columns skipped.");
+                                // Segment B — basement zone: foundationHeight → slabZ
+                                double htB = colTop - foundationHeight;
+                                Debug.WriteLine($"│    Columns [B] Z={foundationHeight:F3} → {colTop:F3}m  [{storyName}]");
+                                var colB = new ColumnImporter(sapModel, globalColumnDxf, gradeSchedule, currentStoryIndex);
+                                colB.ImportColumns(globalColumnLayers, foundationHeight, htB, storyName);
+                                Debug.WriteLine($"│    ✅ Col-B placed={colB.ColumnsCreated} failed={colB.ColumnsFailed}");
+                            }
+                            else
+                            {
+                                Debug.WriteLine($"│    Columns Z={colBase:F3} → {colTop:F3}m  [{storyName}]");
+                                var colImporter = new ColumnImporter(sapModel, globalColumnDxf, gradeSchedule, currentStoryIndex);
+                                colImporter.ImportColumns(globalColumnLayers, colBase, colHt, storyName);
+                                Debug.WriteLine($"│    ✅ Columns placed={colImporter.ColumnsCreated} failed={colImporter.ColumnsFailed}");
+                            }
                         }
 
                         currentStoryIndex++;
