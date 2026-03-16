@@ -317,19 +317,7 @@ namespace ETABS_CAD_Automation.Importers
             return 200;
         }
 
-        //private double CalculateCantileverSpan(List<netDxf.Vector2> pts)
-        //{
-        //    if (pts.Count < 3) return 0;
-        //    double minEdge = double.MaxValue;
-        //    for (int i = 0; i < pts.Count; i++)
-        //    {
-        //        int j = (i + 1) % pts.Count;
-        //        double dx = pts[i].X - pts[j].X, dy = pts[i].Y - pts[j].Y;
-        //        double len = Math.Sqrt(dx * dx + dy * dy);
-        //        if (len < minEdge) minEdge = len;
-        //    }
-        //    return minEdge * MM_TO_M;
-        //}
+
         private double CalculateCantileverSpan(List<netDxf.Vector2> pts)
         {
             if (pts.Count < 3) return 0;

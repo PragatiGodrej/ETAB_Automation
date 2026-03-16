@@ -1,6 +1,8 @@
 ﻿
 
 
+
+
 // ============================================================================
 // FILE: Importers/WallImporterEnhanced.cs — VERSION 3.3
 //
@@ -30,7 +32,7 @@ namespace ETABS_CAD_Automation.Importers
         private GradeScheduleManager gradeSchedule;
 
         private int ntaWallThicknessMm;
-        private readonly Dictionary<string, int> wallThicknessOverrides;
+        private Dictionary<string, int> wallThicknessOverrides;
 
         // ── IS code edition (IS2016 or IS2025) ───────────────────────────
         private readonly WallThicknessCalculator.ISCodeVersion isCode;
@@ -143,8 +145,14 @@ namespace ETABS_CAD_Automation.Importers
             => EnsureWallSection(ntaWallThicknessMm, preferredGrade);
 
         // ====================================================================
-        // PUBLIC IMPORT
+        // PUBLIC IMPORT  —  two-pass: create walls first, then assign piers
         // ====================================================================
+
+        // Holds every wall created across ALL stories: area name + midpoint XY
+        // Key = area object name, Value = (xMid, yMid, isHorizontal)
+        private readonly List<(string area, double xMid, double yMid, bool isHoriz)> _allCreatedWalls
+            = new List<(string, double, double, bool)>();
+
         public void ImportWalls(Dictionary<string, string> layerMapping,
             double elevation, int story)
         {
@@ -173,6 +181,7 @@ namespace ETABS_CAD_Automation.Importers
                     System.Diagnostics.Debug.WriteLine($"    {kv.Key} = {kv.Value}mm");
             }
 
+            // ── PASS 1: create all wall geometry, NO pier assignment yet ──
             foreach (string layerName in wallLayers)
             {
                 var cat = ClassifyWall(layerName);
@@ -198,9 +207,133 @@ namespace ETABS_CAD_Automation.Importers
             System.Diagnostics.Debug.WriteLine($"\n✓ {wallsCreated}  ❌ {wallsFailed}");
         }
 
+        /// <summary>
+        /// Call ONCE after ALL stories have been imported.
+        /// Sorts every created wall (horizontal first left→right row by row,
+        /// then vertical left→right top→bottom) and assigns P1, P2, P3...
+        /// Walls on different stories with the same XY midpoint share a pier name
+        /// automatically because they round to the same key.
+        /// </summary>
+        public void AssignAllPiers()
+        {
+            if (_allCreatedWalls.Count == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("AssignAllPiers: no walls to process.");
+                return;
+            }
+
+            const double ROWGAP = 1.0; // walls within 1 m Y = same row
+
+            // Separate horizontal and vertical — use unique XY keys so same
+            // position on different stories maps to one pier name.
+            var seen = new HashSet<string>();
+            var horizPts = new List<(double rx, double ry)>();
+            var vertPts = new List<(double rx, double ry)>();
+
+            foreach (var w in _allCreatedWalls)
+            {
+                string key = PierKey(w.xMid, w.yMid);
+                if (!seen.Add(key)) continue; // already recorded this XY position
+                if (w.isHoriz) horizPts.Add((w.xMid, w.yMid));
+                else vertPts.Add((w.xMid, w.yMid));
+            }
+
+            // ── Sort horizontals: row by row top→bottom, left→right within row ──
+            horizPts.Sort((a, b) => b.ry != a.ry
+                ? b.ry.CompareTo(a.ry) : a.rx.CompareTo(b.rx));
+
+            var hRows = new List<List<(double rx, double ry)>>();
+            foreach (var pt in horizPts)
+            {
+                bool added = false;
+                foreach (var row in hRows)
+                    if (Math.Abs(row[0].ry - pt.ry) <= ROWGAP) { row.Add(pt); added = true; break; }
+                if (!added) hRows.Add(new List<(double, double)> { pt });
+            }
+            hRows.Sort((a, b) => b[0].ry.CompareTo(a[0].ry));
+            foreach (var row in hRows) row.Sort((a, b) => a.rx.CompareTo(b.rx));
+
+            // ── Sort verticals: left→right, tie-break top→bottom ──
+            vertPts.Sort((a, b) =>
+                Math.Abs(a.rx - b.rx) > 0.25
+                    ? a.rx.CompareTo(b.rx)
+                    : b.ry.CompareTo(a.ry));
+
+            // ── Build pier name map ──
+            var pierMap = new Dictionary<string, string>();
+            int counter = 1;
+            foreach (var row in hRows)
+                foreach (var pt in row)
+                {
+                    string k = PierKey(pt.rx, pt.ry);
+                    if (!pierMap.ContainsKey(k)) pierMap[k] = $"P{counter++}";
+                }
+            foreach (var pt in vertPts)
+            {
+                string k = PierKey(pt.rx, pt.ry);
+                if (!pierMap.ContainsKey(k)) pierMap[k] = $"P{counter++}";
+            }
+
+            System.Diagnostics.Debug.WriteLine(
+                $"AssignAllPiers: {horizPts.Count} horizontal + {vertPts.Count} vertical " +
+                $"= {pierMap.Count} unique piers → assigning to {_allCreatedWalls.Count} walls...");
+
+            // ── PASS 2: assign pier labels to every wall area object ──
+            foreach (var w in _allCreatedWalls)
+            {
+                string k = PierKey(w.xMid, w.yMid);
+                if (!pierMap.TryGetValue(k, out string pierName))
+                {
+                    pierName = $"P{counter++}";
+                    pierMap[k] = pierName;
+                    System.Diagnostics.Debug.WriteLine($"  ⚠ Fallback pier {pierName} for key {k}");
+                }
+
+                sapModel.PierLabel.SetPier(pierName);
+                int ret = sapModel.AreaObj.SetPier(w.area, pierName);
+                System.Diagnostics.Debug.WriteLine(ret == 0
+                    ? $"  ✓ {w.area} → {pierName}"
+                    : $"  ⚠ SetPier failed (ret={ret}) area={w.area} pier={pierName}");
+            }
+
+            System.Diagnostics.Debug.WriteLine("AssignAllPiers: complete.");
+        }
+
         // ====================================================================
         // GEOMETRY CREATION
         // ====================================================================
+        // ── PierKey helper — shared by AssignAllPiers ──
+        private static string PierKey(double x, double y)
+        {
+            const double GRID = 0.25;
+            double rx = Math.Round(x / GRID) * GRID;
+            double ry = Math.Round(y / GRID) * GRID;
+            return $"{rx:F2}_{ry:F2}";
+        }
+
+        /// <summary>Reset wall list and pier map — call before a fresh import run.</summary>
+        /// <summary>
+        /// Updates DXF source, floor height, and wall overrides before each ImportWalls call.
+        /// Allows a single shared instance to be reused across different floor types/stories.
+        /// </summary>
+        public void UpdateDxfAndHeight(DxfDocument doc, double height,
+            int ntaThicknessMm, Dictionary<string, int> wallOverrides)
+        {
+            dxfDoc = doc;
+            floorHeight = height;
+            ntaWallThicknessMm = ntaThicknessMm;
+            // Merge overrides (clear then re-add so removals are respected)
+            wallThicknessOverrides.Clear();
+            if (wallOverrides != null)
+                foreach (var kv in wallOverrides)
+                    wallThicknessOverrides[kv.Key] = kv.Value;
+        }
+
+        public void ResetPiers()
+        {
+            _allCreatedWalls.Clear();
+        }
+
         private bool CreateWallFromLine(netDxf.Entities.Line line,
             double elevation, int story, string section)
         {
@@ -209,21 +342,27 @@ namespace ETABS_CAD_Automation.Importers
                 if (!wallTypeCount.ContainsKey(section)) wallTypeCount[section] = 0;
                 wallTypeCount[section]++;
 
+                double x1 = MX(line.StartPoint.X), y1 = MY(line.StartPoint.Y);
+                double x2 = MX(line.EndPoint.X), y2 = MY(line.EndPoint.Y);
+
                 string[] pts = new string[4];
-                sapModel.PointObj.AddCartesian(MX(line.StartPoint.X), MY(line.StartPoint.Y),
-                    elevation, ref pts[0], "Global");
-                sapModel.PointObj.AddCartesian(MX(line.EndPoint.X), MY(line.EndPoint.Y),
-                    elevation, ref pts[1], "Global");
-                sapModel.PointObj.AddCartesian(MX(line.EndPoint.X), MY(line.EndPoint.Y),
-                    elevation + floorHeight, ref pts[2], "Global");
-                sapModel.PointObj.AddCartesian(MX(line.StartPoint.X), MY(line.StartPoint.Y),
-                    elevation + floorHeight, ref pts[3], "Global");
+                sapModel.PointObj.AddCartesian(x1, y1, elevation, ref pts[0], "Global");
+                sapModel.PointObj.AddCartesian(x2, y2, elevation, ref pts[1], "Global");
+                sapModel.PointObj.AddCartesian(x2, y2, elevation + floorHeight, ref pts[2], "Global");
+                sapModel.PointObj.AddCartesian(x1, y1, elevation + floorHeight, ref pts[3], "Global");
 
                 string area = "";
                 int ret = sapModel.AreaObj.AddByPoint(4, ref pts, ref area, section);
                 if (ret == 0 && !string.IsNullOrEmpty(area))
                 {
                     sapModel.AreaObj.SetGroupAssign(area, GetStoryName(story));
+
+                    // Record for pier assignment in Pass 2
+                    double xMid = (x1 + x2) / 2.0;
+                    double yMid = (y1 + y2) / 2.0;
+                    bool isHoriz = Math.Abs(x2 - x1) >= Math.Abs(y2 - y1);
+                    _allCreatedWalls.Add((area, xMid, yMid, isHoriz));
+
                     return true;
                 }
                 return false;
@@ -278,9 +417,6 @@ namespace ETABS_CAD_Automation.Importers
         {
             try
             {
-                if (!wallTypeCount.ContainsKey(section)) wallTypeCount[section] = 0;
-                wallTypeCount[section]++;
-
                 string[] pts = new string[4];
                 sapModel.PointObj.AddCartesian(x1, y1, elevation, ref pts[0], "Global");
                 sapModel.PointObj.AddCartesian(x2, y2, elevation, ref pts[1], "Global");
@@ -292,16 +428,23 @@ namespace ETABS_CAD_Automation.Importers
                 if (ret == 0 && !string.IsNullOrEmpty(area))
                 {
                     sapModel.AreaObj.SetGroupAssign(area, storyName);
+
+                    // Record for pier assignment in Pass 2
+                    double xMid = (x1 + x2) / 2.0;
+                    double yMid = (y1 + y2) / 2.0;
+                    bool isHoriz = Math.Abs(x2 - x1) >= Math.Abs(y2 - y1);
+                    _allCreatedWalls.Add((area, xMid, yMid, isHoriz));
+
                     return true;
                 }
                 return false;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ CreateWallSegment: {ex.Message}");
+                return false;
+            }
         }
-
-        // ====================================================================
-        // HELPERS
-        // ====================================================================
         private double WallLength(double x1, double y1, double x2, double y2)
         {
             double dx = (x2 - x1) * X_TO_M, dy = (y2 - y1) * Y_TO_M;

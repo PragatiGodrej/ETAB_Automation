@@ -136,9 +136,12 @@ namespace ETAB_Automation.Core
         public static string EnsureWallSection(cSapModel sapModel,
             int thicknessMm, string grade)
         {
-            int thicknessCm = thicknessMm / 10;
+            double thicknessCm = thicknessMm / 10.0;
+            string thicknessCmStr = (thicknessCm == Math.Floor(thicknessCm))
+            ? ((int)thicknessCm).ToString()       // e.g. 300mm → "30"
+            : thicknessCm.ToString("0.#");        // e.g. 325mm → "32.5"
             string gradeNum = (grade ?? "M30").Replace("M", "").Replace("m", "").Trim();
-            string sectionName = $"W{thicknessCm}M{gradeNum}";
+            string sectionName = $"W{thicknessCmStr}M{gradeNum}";
 
             if (definedSections.Contains(sectionName))
                 return sectionName;
