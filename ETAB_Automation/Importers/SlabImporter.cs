@@ -317,20 +317,65 @@ namespace ETABS_CAD_Automation.Importers
             return 200;
         }
 
+        //private double CalculateCantileverSpan(List<netDxf.Vector2> pts)
+        //{
+        //    if (pts.Count < 3) return 0;
+        //    double minEdge = double.MaxValue;
+        //    for (int i = 0; i < pts.Count; i++)
+        //    {
+        //        int j = (i + 1) % pts.Count;
+        //        double dx = pts[i].X - pts[j].X, dy = pts[i].Y - pts[j].Y;
+        //        double len = Math.Sqrt(dx * dx + dy * dy);
+        //        if (len < minEdge) minEdge = len;
+        //    }
+        //    return minEdge * MM_TO_M;
+        //}
         private double CalculateCantileverSpan(List<netDxf.Vector2> pts)
         {
             if (pts.Count < 3) return 0;
-            double minEdge = double.MaxValue;
+
+            // Build edge list: (length, normalised angle 0–180°)
+            var edges = new List<(double len, double angle)>();
             for (int i = 0; i < pts.Count; i++)
             {
                 int j = (i + 1) % pts.Count;
-                double dx = pts[i].X - pts[j].X, dy = pts[i].Y - pts[j].Y;
+                double dx = pts[j].X - pts[i].X;
+                double dy = pts[j].Y - pts[i].Y;
                 double len = Math.Sqrt(dx * dx + dy * dy);
-                if (len < minEdge) minEdge = len;
+                double angle = Math.Atan2(dy, dx) * 180.0 / Math.PI;
+                if (angle < 0) angle += 180.0;
+                edges.Add((len, angle));
             }
-            return minEdge * MM_TO_M;
-        }
 
+            const double ANGLE_TOL = 10.0;
+
+            // Find the shortest-average parallel pair
+            double bestSpan = double.MaxValue;
+            bool foundPair = false;
+
+            for (int a = 0; a < edges.Count - 1; a++)
+            {
+                for (int b = a + 1; b < edges.Count; b++)
+                {
+                    double diff = Math.Abs(edges[a].angle - edges[b].angle);
+                    if (diff > 90) diff = 180.0 - diff;
+
+                    if (diff <= ANGLE_TOL)
+                    {
+                        double avgLen = (edges[a].len + edges[b].len) / 2.0;
+                        if (avgLen < bestSpan)
+                        {
+                            bestSpan = avgLen;
+                            foundPair = true;
+                        }
+                    }
+                }
+            }
+
+            // Fallback to shortest single edge if no parallel pair found
+            double spanMm = foundPair ? bestSpan : edges.Min(e => e.len);
+            return spanMm * MM_TO_M;
+        }
         private int GetUserThickness(string layerUpper)
         {
             var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
